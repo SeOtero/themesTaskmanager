@@ -531,18 +531,15 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
                         {/* BODY */}
                         <div className="p-6 flex-1 overflow-y-auto">
                             
-                            {/* 🔥 NUEVO MENSAJE ACLARATORIO (Solo para Ideas) */}
-                            {ideaType === 'monday' && (
-                                <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                                    <p className="text-xs text-yellow-200/90 leading-relaxed">
-                                        ℹ️ Las ideas pasan al <b>Team Leader</b> para analizarlas. Si la aprueba, tendrás una <span className="text-yellow-400 font-bold">recompensa en monedas</span> y se hablará el lunes.
-                                    </p>
-                                </div>
-                            )}
-
+                            {/* TEXTAREA CON EL PLACEHOLDER MODIFICADO */}
                             <textarea 
                                 className={`w-full bg-black/50 border rounded-lg p-3 text-white text-sm outline-none mb-3 h-32 resize-none focus:ring-1 ${ideaType === 'monday' ? 'border-yellow-900/50 focus:border-yellow-500' : 'border-purple-900/50 focus:border-purple-500'}`} 
-                                placeholder={ideaType === 'monday' ? "Ej: Hacer un torneo de typing..." : "Ej: El botón de login falla a veces..."}
+                                
+                                // 🔥 AQUÍ ESTÁ EL CAMBIO:
+                                placeholder={ideaType === 'monday' 
+                                    ? "Las ideas pasan al Team Leader para analizarlas. Si la aprueba, tendrás una recompensa en monedas y se hablará el lunes." 
+                                    : "Ej: El botón de login falla a veces..."}
+                                
                                 value={ideaText} 
                                 onChange={(e) => setIdeaText(e.target.value)} 
                             />
