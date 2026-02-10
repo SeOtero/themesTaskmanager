@@ -1,0 +1,306 @@
+@import "tailwindcss";
+
+/* #region GLOBAL STYLES & ANIMATIONS */
+body {
+    font-family: 'Inter', sans-serif;
+    width: 100vw; 
+    height: 100vh;
+    overflow-x: hidden; 
+    background-color: #0f172a; /* Fondo base Slate-900 */
+    color: white;
+}
+
+/* Fuentes Personalizadas */
+.font-creepster { font-family: 'Creepster', cursive; }
+.font-christmas { font-family: 'Mountains of Christmas', cursive; }
+.font-retro { font-family: 'VT323', monospace; } 
+.font-lofidex { font-family: 'Quicksand', sans-serif; }
+
+.app-container {
+    min-height: 100vh;
+    padding-top: max(1rem, env(safe-area-inset-top)); 
+    padding-bottom: max(1rem, env(safe-area-inset-bottom)); 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Scrollbars */
+.hide-scrollbar::-webkit-scrollbar { width: 0px; background: transparent; }
+.hide-scrollbar { scrollbar-width: none; }
+
+.task-scroll::-webkit-scrollbar { width: 6px; }
+.task-scroll::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); border-radius: 4px; }
+.task-scroll::-webkit-scrollbar-thumb { background: rgba(150, 150, 150, 0.4); border-radius: 4px; }
+.task-scroll::-webkit-scrollbar-thumb:hover { background: rgba(150, 150, 150, 0.6); }
+
+/* =========================================
+   🎨 FONDOS DE TEMAS (TIENDA) - RESTAURADOS
+   ========================================= */
+
+/* Default / Dark Mode */
+.theme-default {
+    background: #0f172a;
+}
+
+/* Sunset / Atardecer (Animado) */
+@keyframes sunset-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+.bg-sunset-animation {
+    background: linear-gradient(270deg, #2e1065, #4c1d95, #c026d3, #be185d, #1e1b4b);
+    background-size: 800% 800%;
+    animation: sunset-shift 30s ease infinite;
+}
+
+/* Cyberpunk / Neon */
+.theme-cyberpunk {
+    background: radial-gradient(circle at center, #2b002b 0%, #0f0014 100%);
+    background-attachment: fixed;
+}
+
+/* Matrix / Hacker */
+.theme-matrix {
+    background-color: #000000;
+    /* El efecto de lluvia verde lo maneja el componente MatrixEffect.jsx, esto es el base */
+}
+
+/* Lofi / Chill */
+.theme-lofi {
+    background: #2c2520; /* Marrón café suave */
+}
+
+/* Deep Space */
+.theme-space {
+    background: linear-gradient(to bottom, #000000, #0f172a, #1e1b4b);
+    background-attachment: fixed;
+}
+
+/* Forest / Naturaleza */
+.theme-forest {
+    background: linear-gradient(to bottom right, #052e16, #14532d, #064e3b);
+    background-attachment: fixed;
+}
+
+/* Ocean / Agua */
+.theme-ocean {
+    background: linear-gradient(to top, #0c4a6e, #075985, #0284c7);
+    background-attachment: fixed;
+}
+
+/* Valentines / Love */
+.theme-valentines {
+    background: linear-gradient(45deg, #831843, #be185d, #db2777);
+    background-attachment: fixed;
+}
+
+/* Halloween */
+.theme-halloween {
+    background: linear-gradient(to bottom, #270909, #3f1006, #000000);
+}
+
+/* =========================================
+   MARCOS Y BORDES (ITEMS TIENDA)
+   ========================================= */
+
+/* Simples */
+.simple-border-blue { border: 4px solid #3b82f6; box-shadow: 0 0 20px rgba(59, 130, 246, 0.6); }
+.simple-border-red { border: 4px solid #ef4444; box-shadow: 0 0 20px rgba(239, 68, 68, 0.6); }
+.simple-border-green { border: 4px solid #22c55e; box-shadow: 0 0 20px rgba(34, 197, 94, 0.6); }
+.simple-border-gold { border: 4px solid #facc15; box-shadow: 0 0 20px rgba(250, 204, 21, 0.6); }
+
+/* Animados */
+@keyframes rgb-spin { 0% { border-color: #ff0000; box-shadow: 0 0 15px #ff0000; } 20% { border-color: #ffff00; box-shadow: 0 0 15px #ffff00; } 40% { border-color: #00ff00; box-shadow: 0 0 15px #00ff00; } 60% { border-color: #00ffff; box-shadow: 0 0 15px #00ffff; } 80% { border-color: #0000ff; box-shadow: 0 0 15px #0000ff; } 100% { border-color: #ff00ff; box-shadow: 0 0 15px #ff00ff; } }
+.rgb-animated-border { border-width: 4px; border-style: solid; animation: rgb-spin 3s linear infinite alternate; }
+
+@keyframes neon-pulse { 0%, 100% { border-color: #a855f7; box-shadow: 0 0 10px #a855f7, 0 0 20px #a855f7 inset; } 50% { border-color: #d8b4fe; box-shadow: 0 0 25px #d8b4fe, 0 0 10px #d8b4fe inset; } }
+.neon-pulsing-border { border-width: 4px; border-style: solid; animation: neon-pulse 2s ease-in-out infinite; }
+
+@keyframes fire-pulse { 0% { border-color: #ea580c; box-shadow: 0 0 10px #ea580c; } 50% { border-color: #fca5a5; box-shadow: 0 0 25px #dc2626, 0 0 10px #f97316 inset; } 100% { border-color: #ea580c; box-shadow: 0 0 10px #ea580c; } }
+.fire-border { border-width: 4px; border-style: solid; animation: fire-pulse 1.5s ease-in-out infinite; }
+
+@keyframes electric-shock { 0%, 100% { border-color: #3b82f6; box-shadow: 0 0 5px #3b82f6; opacity: 1; } 10% { border-color: #60a5fa; box-shadow: 0 0 15px #93c5fd; opacity: 0.8; } 20% { border-color: #2563eb; box-shadow: 0 0 5px #3b82f6; opacity: 1; } 30% { border-color: #ffffff; box-shadow: 0 0 20px #ffffff; opacity: 1; } 40% { border-color: #3b82f6; box-shadow: 0 0 5px #3b82f6; opacity: 1; } }
+.electric-border { border-width: 4px; border-style: solid; animation: electric-shock 0.2s linear infinite; }
+
+@keyframes glitch-border-anim { 0% { border-color: #00ff00; box-shadow: -2px -2px 0 #ff00ff; transform: translate(0); } 20% { border-color: #ff00ff; box-shadow: 2px 2px 0 #00ff00; transform: translate(-1px, 1px); } 40% { border-color: #00ffff; box-shadow: -2px 2px 0 #ffff00; transform: translate(1px, -1px); } 60% { border-color: #ffff00; box-shadow: 2px -2px 0 #00ffff; transform: translate(-1px, -1px); } 80% { border-color: #ff0000; box-shadow: -2px -2px 0 #0000ff; transform: translate(1px, 1px); } 100% { border-color: #00ff00; box-shadow: 2px 2px 0 #ff00ff; transform: translate(0); } }
+.glitch-border { border-width: 4px; border-style: solid; animation: glitch-border-anim 0.3s steps(2) infinite; }
+
+/* =========================================
+   ANIMACIONES GENERALES
+   ========================================= */
+
+/* Glow Cards (Para el contenedor principal) */
+@keyframes subtle-container-glow {
+    0%, 100% { box-shadow: 0 0 15px rgba(255, 140, 0, 0.4), 0 0 5px rgba(128, 0, 128, 0.2); }
+    50% { box-shadow: 0 0 25px rgba(255, 165, 0, 0.7), 0 0 10px rgba(255, 215, 0, 0.5); }
+}
+.glow-card {
+    animation: subtle-container-glow 6s infinite ease-in-out alternate;
+    position: relative; 
+    overflow: hidden; 
+    border: 1px solid rgba(50, 50, 50, 0.5); 
+}
+
+@keyframes party-container-glow {
+    0%, 100% { box-shadow: 0 0 20px rgba(217, 70, 239, 0.5), 0 0 8px rgba(34, 211, 238, 0.4); } 
+    50% { box-shadow: 0 0 30px rgba(244, 63, 94, 0.7), 0 0 15px rgba(6, 182, 212, 0.6); }
+}
+.party-glow-card {
+    animation: party-container-glow 5s infinite ease-in-out alternate;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(120, 80, 150, 0.5);
+}
+
+/* Efectos de Ambiente */
+@keyframes rain-fall { 0% { transform: translateY(-10vh); } 100% { transform: translateY(110vh); } }
+.rain-drop { position: fixed; top: 0; width: 1px; height: 15px; background: rgba(255, 255, 255, 0.2); pointer-events: none; z-index: 1; animation: rain-fall var(--duration) linear infinite; animation-delay: var(--delay); }
+
+@keyframes particle-drift-and-fade { 0% { transform: translate(0, 0) scale(0.8); opacity: 0; } 100% { transform: translate(calc(var(--rand-x) * 0.1px), 100vh) scale(0.5); opacity: 0; } } .particle { position: fixed; top: -10px; background-color: rgba(255, 165, 0, 0.4); border-radius: 50%; pointer-events: none; z-index: 1; } .animate-particle { animation: particle-drift-and-fade var(--duration) linear infinite; }
+
+@keyframes confetti-fall { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg); opacity: 0; } } .confetti { position: fixed; top: 0; pointer-events: none; z-index: 1; animation: confetti-fall var(--duration) linear infinite; animation-delay: var(--delay); }
+
+.spider-web { position: absolute; top: 0; left: 0; width: 150px; height: 150px; pointer-events: none; z-index: 2; opacity: 0.5; } .spider-web:before, .spider-web:after { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 50%; border: 2px solid rgba(150, 150, 150, 0.4); box-sizing: border-box; mix-blend-mode: screen; } .spider-web:before { transform: rotate(45deg) scaleX(0.5) translate(-10%, 10%); border-radius: 0; border-top: none; border-right: none; clip-path: polygon(0 0, 100% 0, 100% 50%, 0% 100%); } .spider-web:after { transform: rotate(-45deg) scaleX(0.5) translate(-10%, -10%); border-radius: 0; border-top: none; border-left: none; clip-path: polygon(100% 0, 0 0, 0 50%, 100% 100%); } .spider-web .line1, .spider-web .line2 { content: ''; position: absolute; background: rgba(150, 150, 150, 0.4); } .spider-web .line1 { width: 120px; height: 2px; top: 0; left: 0; transform-origin: top left; transform: rotate(25deg); } .spider-web .line2 { width: 120px; height: 2px; top: 0; left: 0; transform-origin: top left; transform: rotate(-25deg); }
+
+@keyframes snowfall { 0% { transform: translateY(-10vh) translateX(0); } 100% { transform: translateY(110vh) translateX(calc(var(--drift) * 15vw)); } } .snowflake { position: fixed; top: 0; background: white; border-radius: 50%; pointer-events: none; z-index: 1; opacity: 0.8; box-shadow: 0 0 8px rgba(255, 255, 255, 0.6); animation: snowfall var(--duration) linear infinite; animation-delay: var(--delay); }
+
+@keyframes twinkle { 0%, 100% { opacity: 0.6; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.1); } } .christmas-light { position: fixed; border-radius: 50%; animation: twinkle var(--duration) ease-in-out infinite alternate; z-index: 1; pointer-events: none; }
+
+@keyframes float-ghost { 0% { transform: translate(var(--start-x), 100vh) scale(1); opacity: 0; } 20% { opacity: 0.6; } 80% { opacity: 0.6; } 100% { transform: translate(var(--end-x), -20vh) scale(1.1); opacity: 0; } } .ghost { position: fixed; bottom: -150px; z-index: 1; pointer-events: none; animation: float-ghost var(--duration) ease-in-out infinite; animation-delay: var(--delay); fill: rgba(255, 255, 255, 0.1); filter: drop-shadow(0 0 15px rgba(200, 220, 255, 0.6)); }
+
+@keyframes magic-float { 0% { transform: translateY(110vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(-10vh) rotate(360deg); opacity: 0; } } .magic-particle { position: fixed; top: 0; pointer-events: none; z-index: 1; animation: magic-float var(--duration) linear infinite; animation-delay: var(--delay); }
+
+@keyframes modal-pop { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } } .modal-content { animation: modal-pop 0.3s ease-out forwards; }
+
+@keyframes wiggle-badge { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } } .wiggle-animation { animation: wiggle-badge 1s ease-in-out infinite; }
+
+@keyframes shine-sweep { 0% { transform: translateX(-150%) skewX(-25deg); } 100% { transform: translateX(150%) skewX(-25deg); } } .shine-bar { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to right, transparent, rgba(255,255,255,0.7), transparent); animation: shine-sweep 3s infinite ease-in-out; }
+
+/* Marquesina de Noticias */
+.marquee-container {
+    overflow: hidden;
+    white-space: nowrap;
+    position: relative;
+    mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+}
+.marquee-content {
+    display: inline-block;
+    padding-left: 100%;
+    animation: marquee 20s linear infinite;
+}
+@keyframes marquee {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(-100%, 0); }
+}
+
+/* Selector Fecha Neón */
+.neon-date-capsule {
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.1), inset 0 0 20px rgba(0, 255, 255, 0.05);
+    backdrop-filter: blur(5px);
+    transition: all 0.3s ease;
+}
+.neon-date-capsule:focus-within {
+    border-color: #00ffff;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.4), inset 0 0 30px rgba(0, 255, 255, 0.1);
+    transform: scale(1.02);
+}
+
+/* Insignia Graduado */
+.grad-badge-glow {
+    filter: drop-shadow(0 0 5px gold);
+    animation: pulse-gold 2s infinite;
+}
+@keyframes pulse-gold {
+    0% { filter: drop-shadow(0 0 2px gold); }
+    50% { filter: drop-shadow(0 0 8px gold); }
+    100% { filter: drop-shadow(0 0 2px gold); }
+}
+.grad-badge-rust {
+    filter: grayscale(100%) opacity(0.5);
+    transition: filter 0.5s ease;
+}
+/* =========================================
+   🐱 TEMA: NEKO TOKYO (KANJIS ROJOS TITILANTES)
+   ========================================= */
+
+.theme-neko {
+    background-color: #1a0b2e;
+    
+    /* CAPAS DE FONDO */
+    background-image: 
+        /* 1. KANJI IZQUIERDA (ROJO NEÓN + ANIMACIÓN TITILAR INTERNA) */
+        /* Se agregó <animate ...> dentro del SVG para que la opacidad cambie de 0.3 a 1 */
+        url("data:image/svg+xml,%3Csvg width='500' height='500' viewBox='0 0 500 500' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='50%25' y='50%25' font-family='sans-serif' font-weight='900' font-size='400' fill='none' stroke='%23ff0033' stroke-width='4' transform='rotate(-20 250 250)' text-anchor='middle' dominant-baseline='middle'%3Eネ%3Canimate attributeName='opacity' values='0.3;1;0.3' dur='2s' repeatCount='indefinite'/%3E%3C/text%3E%3C/svg%3E"),
+        
+        /* 2. KANJI DERECHA (ROJO NEÓN + ANIMACIÓN TITILAR INTERNA) */
+        url("data:image/svg+xml,%3Csvg width='500' height='500' viewBox='0 0 500 500' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='50%25' y='50%25' font-family='sans-serif' font-weight='900' font-size='400' fill='none' stroke='%23ff0033' stroke-width='4' transform='rotate(20 250 250)' text-anchor='middle' dominant-baseline='middle'%3Eコ%3Canimate attributeName='opacity' values='0.3;1;0.3' dur='2.5s' repeatCount='indefinite'/%3E%3C/text%3E%3C/svg%3E"),
+        
+        /* 3. Gradiente Oscuro */
+        linear-gradient(to bottom, rgba(26, 11, 46, 0.9), rgba(5, 1, 10, 0.95)),
+        
+        /* 4. Foto Ciudad */
+        url('https://images.unsplash.com/photo-1565507567568-f9a6cbba2e49?q=80&w=1920&auto=format&fit=crop');
+        
+    /* POSICIONES (Pegados a los costados del tablero) - SIN CAMBIOS */
+    background-position: 
+        calc(50% - 450px) center, 
+        calc(50% + 450px) center, 
+        center center, 
+        center center;
+        
+    background-repeat: no-repeat, no-repeat, no-repeat, no-repeat;
+    
+    background-size: 
+        400px 400px, 
+        400px 400px, 
+        cover, 
+        cover;
+        
+    background-attachment: fixed;
+    
+    /* Cursor de Patita Roja */
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="%23ff0033" stroke="%23ffffff" stroke-width="1.5"><path d="M12 2C10.9 2 10 2.9 10 4C10 5.1 10.9 6 12 6C13.1 6 14 5.1 14 4C14 2.9 13.1 2 12 2M7 5C5.9 5 5 5.9 5 7C5 8.1 5.9 9 7 9C8.1 9 9 8.1 9 7C9 5.9 8.1 5 7 5M17 5C15.9 5 15 5.9 15 7C15 8.1 15.9 9 17 9C18.1 9 19 8.1 19 7C19 5.9 18.1 5 17 5M12 8C9.5 8 7.3 9.3 6.1 11.4C5.5 12.4 6.2 13.7 7.3 13.9L8.5 14.1C9.6 14.3 10.7 14.3 11.8 14.1L16.5 13.2C17.7 13 18.5 11.9 18.1 10.8C17.3 9.2 14.9 8 12 8Z"/></svg>') 16 16, auto;
+}
+
+/* --- CAPA 1: GATOS NEÓN --- */
+.theme-neko::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.2; 
+    
+    /* Gato Geométrico con Ojos */
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 30 L10 10 L30 20 L70 20 L90 10 L80 30 Q 90 50 80 80 Q 50 90 20 80 Q 10 50 20 30 Z' fill='none' stroke='%23d946ef' stroke-width='2'/%3E%3Ccircle cx='35' cy='45' r='5' fill='%2300ffff'/%3E%3Ccircle cx='65' cy='45' r='5' fill='%2300ffff'/%3E%3C/svg%3E");
+    background-size: 350px 350px;
+    animation: floating-cats 60s linear infinite;
+}
+
+/* --- CAPA 2: HUELLITAS --- */
+.theme-neko::after {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.2;
+    
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='30' cy='30' r='6' fill='%23a78bfa'/%3E%3Ccircle cx='18' cy='18' r='2' fill='%23a78bfa'/%3E%3Ccircle cx='42' cy='18' r='2' fill='%23a78bfa'/%3E%3Ccircle cx='12' cy='35' r='2' fill='%23a78bfa'/%3E%3Ccircle cx='48' cy='35' r='2' fill='%23a78bfa'/%3E%3C/svg%3E");
+    background-size: 150px 150px;
+    animation: floating-paws 40s linear infinite reverse;
+}
+
+@keyframes floating-cats {
+    0% { background-position: 0 0; }
+    100% { background-position: 350px 350px; }
+}
+
+@keyframes floating-paws {
+    0% { background-position: 0 0; }
+    100% { background-position: 150px -150px; }
+}
