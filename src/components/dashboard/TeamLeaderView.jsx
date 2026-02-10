@@ -332,27 +332,36 @@ const handleIdeaVerdict = async (idea, verdict) => {
 
     const handleGivePoints = async (userId) => {
         const amount = parseInt(pointsToSend);
+        // Validaciones básicas
         if (!amount || isNaN(amount) || amount === 0) return alert("Ingresa una cantidad válida.");
-        
         if (!userId) return alert("Error: ID de usuario inválido.");
 
         try {
+            console.log(`Enviando ${amount} a ${userId}...`);
             const walletRef = doc(db, "users", userId, "data", "wallet");
             
-            // 🔥 CORRECCIÓN: Usamos updateDoc
-            await updateDoc(walletRef, {
-                "val.value": increment(amount),      
-                "val.coins": increment(amount),
-                "val.lofiCoins": increment(amount),
-                
-                // Actualizamos también la raíz
+            // 🔥 SOLUCIÓN DEFINITIVA: Estructura de Objeto Anidada 🔥
+            // Usamos setDoc con merge: true.
+            // En lugar de "val.value", escribimos el objeto { val: { value: ... } }
+            // Esto asegura que si 'val' no existe, lo cree. Y si existe, sume dentro.
+            
+            await setDoc(walletRef, {
+                val: {
+                    value: increment(amount),
+                    coins: increment(amount),
+                    lofiCoins: increment(amount)
+                },
+                // Actualizamos raíz también por seguridad
                 value: increment(amount),
                 coins: increment(amount),
                 lofiCoins: increment(amount)
-            });
+            }, { merge: true });
             
-            alert(`✅ Se enviaron ${amount} monedas al usuario.`);
+            alert(`✅ Se enviaron ${amount} monedas correctamente.`);
             setPointsToSend(0);
+            
+            // (Opcional) Forzamos refrescar la lista de usuarios para ver si algo cambió visualmente
+            // aunque los puntos no se ven en la tabla, confirma que la operación terminó.
         } catch (e) {
             console.error("Error al enviar puntos:", e);
             alert(`Error: ${e.message}`);
