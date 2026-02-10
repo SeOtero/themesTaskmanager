@@ -97,15 +97,37 @@ const App = () => {
     const [userProfile, setUserProfile] = useState(null);
     const [showDashboard, setShowDashboard] = useState(false); 
 
-    useEffect(() => {
+   useEffect(() => {
         if (user) {
             const fetchRole = async () => {
                 try {
                     const docRef = doc(db, "users", user.uid);
                     const docSnap = await getDoc(docRef);
-                    if (docSnap.exists()) setUserProfile(docSnap.data());
-                    else setUserProfile({ role: 'agent', team: 'default' });
-                } catch (e) { console.error("Error fetching user role", e); }
+                    
+                    if (docSnap.exists()) {
+                        // Si ya existe, cargamos su perfil
+                        setUserProfile(docSnap.data());
+                    } else {
+                        // 🚨 AQUÍ ESTABA EL PROBLEMA
+                        // Si NO existe, lo CREAMOS en la base de datos
+                        const newProfile = { 
+                            name: user.displayName || user.email,
+                            email: user.email,
+                            photoURL: user.photoURL || '',
+                            role: 'agent',       // Rol por defecto
+                            team: 'default',     // Equipo por defecto
+                            createdAt: Date.now()
+                        };
+                        
+                        // Guardamos en Firebase
+                        await setDoc(docRef, newProfile);
+                        
+                        // Y lo cargamos en memoria
+                        setUserProfile(newProfile);
+                    }
+                } catch (e) { 
+                    console.error("Error fetching user role", e); 
+                }
             };
             fetchRole();
         }
