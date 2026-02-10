@@ -1,7 +1,12 @@
 import React from 'react';
-import myLogo from '../../assets/logo.png'; 
+import myLogo from '../../assets/logo.png'; // ✅ Mantenemos tu logo
 
-const EconomyBar = ({ coins, onOpenShop }) => { // <--- Quitamos onOpenCasino
+const EconomyBar = ({ coins, onOpenShop }) => {
+    // 🔥 LÓGICA DE PROTECCIÓN:
+    // Si 'coins' llega como null, undefined o un objeto raro, mostramos 0.
+    // Si llega un número, lo mostramos.
+    const displayCoins = (typeof coins === 'number') ? coins : 0;
+
     return (
         <div className="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 animate-slideDown">
             {/* Contenedor Principal: Efecto Cristal Oscuro */}
@@ -20,7 +25,8 @@ const EconomyBar = ({ coins, onOpenShop }) => { // <--- Quitamos onOpenCasino
                     <div className="flex flex-col">
                         <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none">Balance</span>
                         <span className="text-base font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-300 leading-tight tabular-nums">
-                            {coins.toLocaleString()}
+                            {/* ✅ USAMOS LA VARIABLE SEGURA AQUÍ */}
+                            {displayCoins.toLocaleString()}
                         </span>
                     </div>
                 </div>
@@ -39,8 +45,6 @@ const EconomyBar = ({ coins, onOpenShop }) => { // <--- Quitamos onOpenCasino
                     <span className="text-xl filter drop-shadow-md group-hover:scale-110 transition-transform">🛒</span>
                     <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] bg-black text-white px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">Tienda</span>
                 </button>
-
-                {/* (El botón de Casino ha sido eliminado aquí) */}
 
             </div>
         </div>
