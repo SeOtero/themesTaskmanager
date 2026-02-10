@@ -130,25 +130,32 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
     const [pastReports, setPastReports] = useFirestoreDoc('data', 'reports', [], shouldLoadData ? user : null);
     const [manualTheme, setManualTheme] = useFirestoreDoc('config', 'theme', 'default', shouldLoadData ? user : null);
 
-    // 🔥 CORRECCIÓN BILLETERA (INICIO) 🔥
-    // 1. Leemos los datos tal cual vienen de Firebase (puede ser número u objeto)
+    // 🔥 BLOQUE DE BILLETERA "A PRUEBA DE BALAS" 🔥
     const [rawWalletData, setRawWalletData, loadingCoins] = useFirestoreDoc('data', 'wallet', 0, shouldLoadData ? user : null);
 
-    // 2. Traductor: Extrae el número correcto automáticamente
+    // 1. Diagnóstico: Esto imprimirá en la consola (F12) qué está llegando exactamente
+    useEffect(() => {
+        console.log("💰 DATOS DE BILLETERA RECIBIDOS:", rawWalletData);
+    }, [rawWalletData]);
+
+    // 2. Traductor Mejorado: Usa '??' para no fallar si el valor es 0
     const lofiCoins = useMemo(() => {
-        if (typeof rawWalletData === 'object' && rawWalletData !== null) {
-            // Busca en cualquiera de los campos posibles
-            return rawWalletData.value || rawWalletData.coins || rawWalletData.lofiCoins || 0;
+        if (rawWalletData === undefined || rawWalletData === null) return 0;
+        
+        if (typeof rawWalletData === 'object') {
+            // Busca en orden de prioridad. El '??' permite que el 0 sea un valor válido.
+            const val = rawWalletData.value ?? rawWalletData.coins ?? rawWalletData.lofiCoins;
+            return Number(val) || 0;
         }
+        
         return Number(rawWalletData) || 0;
     }, [rawWalletData]);
 
-    // 3. Wrapper: Para que el resto de la app pueda guardar sin problemas
     const setLofiCoins = (newValue) => {
         setRawWalletData({ value: newValue, coins: newValue, lofiCoins: newValue });
     };
-    // 🔥 CORRECCIÓN BILLETERA (FIN) 🔥
-    
+    // 🔥 FIN BLOQUE BILLETERA 🔥
+
     const [hourlyRate, setHourlyRate] = useFirestoreDoc('config', 'hourlyRate', '', shouldLoadData ? user : null);
     const [weeklyGoal, setWeeklyGoal] = useFirestoreDoc('config', 'weeklyGoal', 10, shouldLoadData ? user : null);
     const [inventory, setInventory] = useFirestoreDoc('data', 'inventory', ['default'], shouldLoadData ? user : null);
