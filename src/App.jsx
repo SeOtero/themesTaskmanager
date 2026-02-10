@@ -97,37 +97,15 @@ const App = () => {
     const [userProfile, setUserProfile] = useState(null);
     const [showDashboard, setShowDashboard] = useState(false); 
 
-   useEffect(() => {
+    useEffect(() => {
         if (user) {
             const fetchRole = async () => {
                 try {
                     const docRef = doc(db, "users", user.uid);
                     const docSnap = await getDoc(docRef);
-                    
-                    if (docSnap.exists()) {
-                        // Si ya existe, cargamos su perfil
-                        setUserProfile(docSnap.data());
-                    } else {
-                        // 🚨 AQUÍ ESTABA EL PROBLEMA
-                        // Si NO existe, lo CREAMOS en la base de datos
-                        const newProfile = { 
-                            name: user.displayName || user.email,
-                            email: user.email,
-                            photoURL: user.photoURL || '',
-                            role: 'agent',       // Rol por defecto
-                            team: 'default',     // Equipo por defecto
-                            createdAt: Date.now()
-                        };
-                        
-                        // Guardamos en Firebase
-                        await setDoc(docRef, newProfile);
-                        
-                        // Y lo cargamos en memoria
-                        setUserProfile(newProfile);
-                    }
-                } catch (e) { 
-                    console.error("Error fetching user role", e); 
-                }
+                    if (docSnap.exists()) setUserProfile(docSnap.data());
+                    else setUserProfile({ role: 'agent', team: 'default' });
+                } catch (e) { console.error("Error fetching user role", e); }
             };
             fetchRole();
         }
@@ -151,7 +129,26 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
     // --- ESTADOS FIREBASE ---
     const [pastReports, setPastReports] = useFirestoreDoc('data', 'reports', [], shouldLoadData ? user : null);
     const [manualTheme, setManualTheme] = useFirestoreDoc('config', 'theme', 'default', shouldLoadData ? user : null);
-    const [lofiCoins, setLofiCoins, loadingCoins] = useFirestoreDoc('data', 'wallet', 0, shouldLoadData ? user : null);
+
+    // 🔥 CORRECCIÓN BILLETERA (INICIO) 🔥
+    // 1. Leemos los datos tal cual vienen de Firebase (puede ser número u objeto)
+    const [rawWalletData, setRawWalletData, loadingCoins] = useFirestoreDoc('data', 'wallet', 0, shouldLoadData ? user : null);
+
+    // 2. Traductor: Extrae el número correcto automáticamente
+    const lofiCoins = useMemo(() => {
+        if (typeof rawWalletData === 'object' && rawWalletData !== null) {
+            // Busca en cualquiera de los campos posibles
+            return rawWalletData.value || rawWalletData.coins || rawWalletData.lofiCoins || 0;
+        }
+        return Number(rawWalletData) || 0;
+    }, [rawWalletData]);
+
+    // 3. Wrapper: Para que el resto de la app pueda guardar sin problemas
+    const setLofiCoins = (newValue) => {
+        setRawWalletData({ value: newValue, coins: newValue, lofiCoins: newValue });
+    };
+    // 🔥 CORRECCIÓN BILLETERA (FIN) 🔥
+    
     const [hourlyRate, setHourlyRate] = useFirestoreDoc('config', 'hourlyRate', '', shouldLoadData ? user : null);
     const [weeklyGoal, setWeeklyGoal] = useFirestoreDoc('config', 'weeklyGoal', 10, shouldLoadData ? user : null);
     const [inventory, setInventory] = useFirestoreDoc('data', 'inventory', ['default'], shouldLoadData ? user : null);
