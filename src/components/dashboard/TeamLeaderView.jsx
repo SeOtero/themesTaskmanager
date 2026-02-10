@@ -86,7 +86,7 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
     const [usersList, setUsersList] = useState([]);
     const [editingUserId, setEditingUserId] = useState(null);
     const [editForm, setEditForm] = useState({ role: '', team: '' });
-    const [pointsToSend, setPointsToSend] = useState(0); // Estado para los puntos manuales
+    const [pointsToSend, setPointsToSend] = useState(0); 
 
     // --- CARGA DE DATOS ---
     useEffect(() => {
@@ -273,19 +273,22 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
     const handleApproveRequest = async (req) => { try { await setDoc(doc(db, "weekly_schedules", `${req.uid}_${req.weekId}`), { uid: req.uid, userName: req.userName, weekId: req.weekId, schedule: req.proposedSchedule, updatedAt: Date.now() }); await deleteDoc(doc(db, "schedule_requests", req.id)); alert("✅ Solicitud Aprobada"); } catch (e) { alert("Error al aprobar."); } };
     const handleRejectRequest = async (reqId) => { if(!window.confirm("¿Rechazar?")) return; try { await deleteDoc(doc(db, "schedule_requests", reqId)); } catch (e) { alert("Error al rechazar."); } };
 
-    // --- HANDLERS IDEAS ---
+    // --- HANDLERS IDEAS Y PUNTOS (CORREGIDO) ---
     const generateMondaySummary = () => { const visibleIdeas = teamIdeas.filter(i => i.type === 'monday' && !i.isArchived); const approvedIdeas = visibleIdeas.filter(i => i.status === 'approved'); if (approvedIdeas.length === 0) { alert("No hay ideas aprobadas."); return; } const range = getDateRange(); let summary = `📋 *RESUMEN DE IDEAS*\n📅 Periodo: ${range.start} al ${range.end}\n━━━━━━━━━━━━━━━━\n\n`; approvedIdeas.forEach((idea, index) => { summary += `💡 *TEMA #${index + 1}* (${idea.userName})\n📝 "${idea.content}"\n\n`; }); setSummaryText(summary); setShowSummaryModal(true); };
     const handleSendIdea = async () => { if (!newIdeaText.trim()) return; const currentUser = auth.currentUser; if (!currentUser) return; const now = new Date(); const timestampStr = now.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); const newIdea = { uid: currentUser.uid, userName: currentUser.displayName || currentUser.email || "Admin", team: currentUserTeam || 'admin', content: newIdeaText, type: newIdeaType, timestamp: Date.now(), timestampStr: timestampStr, analysis: { pros: "", cons: "" }, status: "new", isArchived: false }; try { await addDoc(collection(db, "monday_ideas"), newIdea); setNewIdeaText(""); alert("Enviado."); setIsSendIdeaModalOpen(false); fetchIdeas(); } catch (e) { alert("Error."); } };
+    
+    // --- CORRECCIÓN 1: APROBAR IDEA (ACTUALIZA TODOS LOS CAMPOS POSIBLES) ---
     const handleIdeaVerdict = async (idea, verdict) => { 
         if (idea.status !== 'new') return; 
         try { 
             if (verdict === 'approved') { 
                 await updateDoc(doc(db, "monday_ideas", idea.id), { status: 'approved' }); 
-                // Asegurar que la billetera exista
+                // Asegurar que la billetera exista y actualizar TODOS los campos
                 const walletRef = doc(db, "users", idea.uid, "data", "wallet");
                 await setDoc(walletRef, { 
-                    lofiCoins: increment(50), 
-                    coins: increment(50) 
+                    value: increment(50),      // Para hooks genéricos
+                    lofiCoins: increment(50),  // Por si acaso
+                    coins: increment(50)       // Por si acaso
                 }, { merge: true }); 
                 alert("✅ Aprobada +50 Coins"); 
             } else { 
@@ -316,17 +319,18 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
         } catch (e) { alert("Error al guardar."); } 
     };
 
-    // 🔥 NUEVA FUNCIÓN: DAR PUNTOS MANUALMENTE
+    // --- CORRECCIÓN 2: DAR PUNTOS MANUALMENTE (ACTUALIZA TODOS LOS CAMPOS) ---
     const handleGivePoints = async (userId) => {
         const amount = parseInt(pointsToSend);
         if (!amount || amount === 0) return alert("Ingresa una cantidad válida.");
         
         try {
             const walletRef = doc(db, "users", userId, "data", "wallet");
-            // Usamos setDoc con merge para crear la billetera si no existe
+            // Actualizamos 'value', 'lofiCoins' y 'coins' para cubrir todas las bases
             await setDoc(walletRef, {
-                lofiCoins: increment(amount),
-                coins: increment(amount) // Por si acaso usas 'coins' en otro lado
+                value: increment(amount),      // Este es el que probablemente lee tu hook
+                lofiCoins: increment(amount),  
+                coins: increment(amount) 
             }, { merge: true });
             
             alert(`✅ Se enviaron ${amount} monedas al usuario.`);
