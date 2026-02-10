@@ -289,7 +289,7 @@ const handleIdeaVerdict = async (idea, verdict) => {
                 const walletRef = doc(db, "users", idea.uid, "data", "wallet");
                 
                 // 🔥 CAMBIO AQUÍ: Usamos comillas para entrar en 'val'
-                await setDoc(walletRef, { 
+                await updateDoc(walletRef, { 
                     "val.value": increment(50),      
                     "val.coins": increment(50),
                     "val.lofiCoins": increment(50),
@@ -340,7 +340,7 @@ const handleIdeaVerdict = async (idea, verdict) => {
             const walletRef = doc(db, "users", userId, "data", "wallet");
             
             // 🔥 CAMBIO AQUÍ: Apuntamos dentro de 'val'
-            await setDoc(walletRef, {
+            await updateDocDoc(walletRef, {
                 "val.value": increment(amount),      
                 "val.coins": increment(amount),
                 "val.lofiCoins": increment(amount),
