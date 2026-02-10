@@ -279,7 +279,6 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
     
 const handleIdeaVerdict = async (idea, verdict) => { 
         if (idea.status !== 'new') return; 
-        
         if (!idea.uid) { alert("Error: La idea no tiene UID asociado."); return; }
 
         try { 
@@ -288,17 +287,15 @@ const handleIdeaVerdict = async (idea, verdict) => {
                 
                 const walletRef = doc(db, "users", idea.uid, "data", "wallet");
                 
-                // 🔥 CORRECCIÓN: Usamos updateDoc para entrar correctamente en 'val'
-                await updateDoc(walletRef, { 
-                    "val.value": increment(50),      
-                    "val.coins": increment(50),
-                    "val.lofiCoins": increment(50),
-                    
-                    // Actualizamos también la raíz para mantener todo igual
-                    value: increment(50),
-                    coins: increment(50),
-                    lofiCoins: increment(50)
-                }); 
+                // 🔥 VERSIÓN LIMPIA: Solo escribe dentro de 'val'
+                // Usamos setDoc con merge para mayor seguridad si la estructura val no existe
+                await setDoc(walletRef, { 
+                    val: {
+                        value: increment(50),
+                        coins: increment(50),
+                        lofiCoins: increment(50)
+                    }
+                }, { merge: true }); 
                 
                 alert("✅ Aprobada +50 Coins"); 
             } else { 
@@ -332,7 +329,6 @@ const handleIdeaVerdict = async (idea, verdict) => {
 
     const handleGivePoints = async (userId) => {
         const amount = parseInt(pointsToSend);
-        // Validaciones básicas
         if (!amount || isNaN(amount) || amount === 0) return alert("Ingresa una cantidad válida.");
         if (!userId) return alert("Error: ID de usuario inválido.");
 
@@ -340,34 +336,23 @@ const handleIdeaVerdict = async (idea, verdict) => {
             console.log(`Enviando ${amount} a ${userId}...`);
             const walletRef = doc(db, "users", userId, "data", "wallet");
             
-            // 🔥 SOLUCIÓN DEFINITIVA: Estructura de Objeto Anidada 🔥
-            // Usamos setDoc con merge: true.
-            // En lugar de "val.value", escribimos el objeto { val: { value: ... } }
-            // Esto asegura que si 'val' no existe, lo cree. Y si existe, sume dentro.
-            
+            // 🔥 VERSIÓN LIMPIA: Solo escribe dentro de 'val'
+            // Eliminamos las líneas que escribían en la raíz (value, coins, lofiCoins sueltos)
             await setDoc(walletRef, {
                 val: {
                     value: increment(amount),
                     coins: increment(amount),
                     lofiCoins: increment(amount)
-                },
-                // Actualizamos raíz también por seguridad
-                value: increment(amount),
-                coins: increment(amount),
-                lofiCoins: increment(amount)
+                }
             }, { merge: true });
             
             alert(`✅ Se enviaron ${amount} monedas correctamente.`);
             setPointsToSend(0);
-            
-            // (Opcional) Forzamos refrescar la lista de usuarios para ver si algo cambió visualmente
-            // aunque los puntos no se ven en la tabla, confirma que la operación terminó.
         } catch (e) {
             console.error("Error al enviar puntos:", e);
             alert(`Error: ${e.message}`);
         }
     };
-
     return (
         <div className="min-h-screen w-full bg-slate-950 text-white font-inter animate-fadeIn pb-20 relative overflow-x-hidden selection:bg-indigo-500 selection:text-white">
             <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/30 via-slate-950 to-black pointer-events-none"></div>
