@@ -3,20 +3,20 @@ import { collection, query, where, getDocs, getDoc, doc, updateDoc, setDoc, incr
 import { db, auth } from '../../firebase'; 
 import { getNextWeekID } from '../../utils/helpers'; 
 
-// --- LISTA DE TAREAS ---
+// --- 1. LISTA DE TAREAS REORDENADA (Según Feedback) ---
 const KNOWN_TASKS = [
-    "CALL Pending Orders", 
-    "CHAT Pending Orders", 
-    "Chat en vivo (filtro Abiertos)",
-    "Chat en vivo (filtro Pendiente)", 
     "Columna CONFIRMADO", 
+    "Columna UPSELL",           // Antes "Por T. o Por LL."
     "Columna DATOS ENTREGA",
-    "Columna LATE VERIFICATION", 
-    "Columna UPSELL", 
-    "Columna REMINDER", 
     "Columna RESPONDER", 
-    "Facebook/Instagram Comments & Chats", 
-    "Ordenes confirmadas sheet (CHECK info)"
+    "Columna REMINDER",
+    "Chat en vivo (filtro Pendiente)", // Agrupado cerca de Reminder
+    "Columna LATE VERIFICATION", 
+    "Chat en vivo (filtro Abiertos)",
+    "Ordenes confirmadas sheet (CHECK info)",
+    "CHAT Pending Orders", 
+    "CALL Pending Orders", 
+    "Facebook/Instagram Comments & Chats"
 ];
 
 const WEEK_DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
@@ -257,23 +257,17 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
     const toggleRow = (id) => setExpandedReportId(expandedReportId === id ? null : id);
     const formatTime = (ms) => { if (!ms) return '0h 0m'; const h = Math.floor(ms / 3600000); const m = Math.floor((ms % 3600000) / 60000); return `${h}h ${m}m`; };
     
-    // --- 🔥 AQUÍ ESTÁ LA FUNCIÓN RECUPERADA 🔥 ---
+    // --- FUNCIÓN DE FILTRADO (DEJA QUE FUNCIONE LA PESTAÑA DEV) ---
     const getFilteredIdeas = () => {
         const range = getDateRange();
         let filtered = teamIdeas;
-        
-        // 1. Filtrar por tipo (monday vs dev)
         if (activeTab === 'ideas') filtered = filtered.filter(i => i.type === 'monday');
         else if (activeTab === 'dev') filtered = filtered.filter(i => i.type === 'dev');
-        
-        // 2. Filtrar por fecha (si no es diario)
         if (viewMode !== 'daily') {
             const startMs = range.startDateObj ? range.startDateObj.getTime() : 0;
             const endMs = range.endDateObj ? range.endDateObj.getTime() : 9999999999999;
             filtered = filtered.filter(idea => idea.timestamp >= startMs && idea.timestamp <= endMs);
         }
-        
-        // 3. Filtrar archivados
         filtered = filtered.filter(idea => showArchived ? idea.isArchived : !idea.isArchived);
         return filtered;
     };
@@ -318,7 +312,10 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
                     </div>
                     <div className="flex gap-3">
                         <button onClick={() => setIsGoalsModalOpen(true)} className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-white/5 transition-all flex items-center gap-2 hover:text-white"><span>🎯</span> METAS</button>
-                        <button onClick={onLogout} className="px-4 py-2 rounded-lg bg-red-900/20 hover:bg-red-900/40 text-red-400 text-xs font-bold border border-red-500/20 transition-all">SALIR</button>
+                        {/* 🔥 2. BOTÓN ATRÁS (Azul) */}
+                        <button onClick={onLogout} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold border border-blue-500/20 transition-all flex items-center gap-2">
+                            ⬅ ATRÁS
+                        </button>
                     </div>
                 </div>
             </div>
@@ -374,7 +371,7 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
                     </div>
                 )}
 
-                {/* 2. PLANNER */}
+                {/* 2. PLANNER (CON ANCHO DE COLUMNA AJUSTADO) */}
                 {activeTab === 'planner' && (
                     <div className="flex gap-6 h-[75vh] animate-fadeIn">
                         
@@ -414,12 +411,12 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
                                 );
                             })}
                             
-                            <button onClick={() => setShowRequestsModal(true)} className="w-full mt-4 bg-yellow-600/20 text-yellow-400 border border-yellow-600/30 rounded py-2 text-xs font-bold hover:bg-yellow-600/40">
+                            <button onClick={() => setShowRequestsModal(true)} className="w-full mt-auto bg-blue-900/30 text-blue-400 border border-blue-500/30 rounded py-3 text-xs font-bold hover:bg-blue-900/50 transition">
                                 🔔 Solicitudes ({scheduleRequests.length})
                             </button>
                         </div>
                         
-                        {/* TABLA PRINCIPAL */}
+                        {/* TABLA PRINCIPAL (Con Scroll Horizontal y ancho mínimo) */}
                         <div className="flex-1 flex flex-col bg-slate-900 border border-white/10 rounded-xl overflow-hidden shadow-2xl">
                             <div className="flex bg-black/40 border-b border-white/10">
                                 {WEEK_DAYS.map(d => (
