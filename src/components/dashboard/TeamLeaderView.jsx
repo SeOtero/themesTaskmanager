@@ -287,8 +287,7 @@ const handleIdeaVerdict = async (idea, verdict) => {
                 
                 const walletRef = doc(db, "users", idea.uid, "data", "wallet");
                 
-                // 🔥 VERSIÓN LIMPIA: Solo escribe dentro de 'val'
-                // Usamos setDoc con merge para mayor seguridad si la estructura val no existe
+                // ✅ VERSIÓN LIMPIA: Solo sumamos dentro de 'val'
                 await setDoc(walletRef, { 
                     val: {
                         value: increment(50),
@@ -297,7 +296,7 @@ const handleIdeaVerdict = async (idea, verdict) => {
                     }
                 }, { merge: true }); 
                 
-                alert("✅ Aprobada +50 Coins"); 
+                alert("✅ Aprobada +50 Coins (Solo en 'val')"); 
             } else { 
                 await updateDoc(doc(db, "monday_ideas", idea.id), { status: 'rejected' }); 
                 alert("Rechazada."); 
@@ -333,11 +332,11 @@ const handleIdeaVerdict = async (idea, verdict) => {
         if (!userId) return alert("Error: ID de usuario inválido.");
 
         try {
-            console.log(`Enviando ${amount} a ${userId}...`);
             const walletRef = doc(db, "users", userId, "data", "wallet");
             
-            // 🔥 VERSIÓN LIMPIA: Solo escribe dentro de 'val'
-            // Eliminamos las líneas que escribían en la raíz (value, coins, lofiCoins sueltos)
+            // ✅ VERSIÓN LIMPIA Y SEGURA
+            // Usamos setDoc con merge: true y definimos SOLO la estructura anidada.
+            // Esto NO toca ni crea nada fuera de 'val'.
             await setDoc(walletRef, {
                 val: {
                     value: increment(amount),
@@ -346,7 +345,7 @@ const handleIdeaVerdict = async (idea, verdict) => {
                 }
             }, { merge: true });
             
-            alert(`✅ Se enviaron ${amount} monedas correctamente.`);
+            alert(`✅ Se enviaron ${amount} monedas (Solo en 'val').`);
             setPointsToSend(0);
         } catch (e) {
             console.error("Error al enviar puntos:", e);
