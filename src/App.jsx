@@ -125,36 +125,31 @@ const App = () => {
 
 const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfile }) => {
     const shouldLoadData = !loading && user;
-
-    // --- ESTADOS FIREBASE ---
+// --- ESTADOS FIREBASE ---
     const [pastReports, setPastReports] = useFirestoreDoc('data', 'reports', [], shouldLoadData ? user : null);
     const [manualTheme, setManualTheme] = useFirestoreDoc('config', 'theme', 'default', shouldLoadData ? user : null);
 
-    // 🔥 BLOQUE DE BILLETERA "A PRUEBA DE BALAS" 🔥
+    // 🔥 LÓGICA ESTRICTA: SOLO LEE 'value' 🔥
     const [rawWalletData, setRawWalletData, loadingCoins] = useFirestoreDoc('data', 'wallet', 0, shouldLoadData ? user : null);
 
-    // 1. Diagnóstico: Esto imprimirá en la consola (F12) qué está llegando exactamente
-    useEffect(() => {
-        console.log("💰 DATOS DE BILLETERA RECIBIDOS:", rawWalletData);
-    }, [rawWalletData]);
-
-    // 2. Traductor Mejorado: Usa '??' para no fallar si el valor es 0
     const lofiCoins = useMemo(() => {
-        if (rawWalletData === undefined || rawWalletData === null) return 0;
-        
+        // 1. Si no hay datos, mostramos 0
+        if (!rawWalletData) return 0;
+
+        // 2. Si es un objeto (lo normal), DEVOLVEMOS SOLO rawWalletData.value
         if (typeof rawWalletData === 'object') {
-            // Busca en orden de prioridad. El '??' permite que el 0 sea un valor válido.
-            const val = rawWalletData.value ?? rawWalletData.coins ?? rawWalletData.lofiCoins;
-            return Number(val) || 0;
+            return Number(rawWalletData.value) || 0; 
         }
-        
+
+        // 3. Si por casualidad es un número suelto (base de datos antigua), lo usamos
         return Number(rawWalletData) || 0;
     }, [rawWalletData]);
 
+    // Al guardar, actualizamos todo para mantener consistencia, pero la App solo leerá 'value'
     const setLofiCoins = (newValue) => {
         setRawWalletData({ value: newValue, coins: newValue, lofiCoins: newValue });
     };
-    // 🔥 FIN BLOQUE BILLETERA 🔥
+    // 🔥 FIN LÓGICA ESTRICTA 🔥
 
     const [hourlyRate, setHourlyRate] = useFirestoreDoc('config', 'hourlyRate', '', shouldLoadData ? user : null);
     const [weeklyGoal, setWeeklyGoal] = useFirestoreDoc('config', 'weeklyGoal', 10, shouldLoadData ? user : null);
