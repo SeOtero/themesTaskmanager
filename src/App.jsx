@@ -129,35 +129,51 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
     const [pastReports, setPastReports] = useFirestoreDoc('data', 'reports', [], shouldLoadData ? user : null);
     const [manualTheme, setManualTheme] = useFirestoreDoc('config', 'theme', 'default', shouldLoadData ? user : null);
 
-    const [rawWalletData, setRawWalletData, loadingCoins] = useFirestoreDoc('data', 'wallet', { 
-    val: { value: 0, coins: 0, lofiCoins: 0 } 
-}, shouldLoadData ? user : null);
+    // 🔥 BILLETERA: VERSIÓN APLANADORA DE ERRORES 🔥
+    // Inicializamos con null para detectar si cargó o no
+    const [rawWalletData, setRawWalletData, loadingCoins] = useFirestoreDoc('data', 'wallet', null, shouldLoadData ? user : null);
 
     const lofiCoins = useMemo(() => {
-        // 1. Si no hay datos, mostramos 0
         if (!rawWalletData) return 0;
 
-        // 2. Si es un objeto (lo normal), DEVOLVEMOS SOLO rawWalletData.value
-        if (typeof rawWalletData === 'object') {
-            return Number(rawWalletData.value) || 0; 
+        // 1. DETECTOR DE ERRORES (Matrioshka):
+        // Si existe val.val, significa que se anidó doble por error. Leemos el de más adentro (el real).
+        if (rawWalletData.val && rawWalletData.val.val) {
+            return Number(rawWalletData.val.val.value) || 0;
         }
 
-        // 3. Si por casualidad es un número suelto (base de datos antigua), lo usamos
-        return Number(rawWalletData) || 0;
+        // 2. Lectura Normal (Estructura correcta)
+        if (rawWalletData.val) {
+            return Number(rawWalletData.val.value) || 0;
+        }
+
+        // 3. Lectura Antigua (Raíz)
+        return Number(rawWalletData.value) || 0;
     }, [rawWalletData]);
 
-    // Al guardar, actualizamos todo para mantener consistencia, pero la App solo leerá 'value'
+
+    // 🔧 FUNCIÓN DE GUARDADO "APLANADORA"
+    // Esta función reescribe TODO el documento con la estructura limpia.
+    // Elimina las anidaciones dobles automáticamente la próxima vez que el usuario gane/gaste monedas.
     const setLofiCoins = (newValue) => {
-        // 🔥 AL GUARDAR: Escribimos SOLO dentro de 'val'
-        setRawWalletData({
+        const cleanStructure = {
+            // Estructura Anidada Correcta (Nivel 1)
             val: {
                 value: newValue,
                 coins: newValue,
                 lofiCoins: newValue
-            }
-        });
+            },
+            // Estructura Raíz (Para compatibilidad y matar fantasmas)
+            value: newValue,
+            coins: newValue,
+            lofiCoins: newValue
+        };
+
+        // setRawWalletData usa setDoc con merge, pero al pasar la estructura completa,
+        // corregirá los valores desfasados.
+        setRawWalletData(cleanStructure);
     };
-    // 🔥 FIN LÓGICA ESTRICTA 🔥
+    // 🔥 FIN CORRECCIÓN 🔥
 
     const [hourlyRate, setHourlyRate] = useFirestoreDoc('config', 'hourlyRate', '', shouldLoadData ? user : null);
     const [weeklyGoal, setWeeklyGoal] = useFirestoreDoc('config', 'weeklyGoal', 10, shouldLoadData ? user : null);
