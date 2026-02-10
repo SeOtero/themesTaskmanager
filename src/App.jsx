@@ -129,8 +129,9 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
     const [pastReports, setPastReports] = useFirestoreDoc('data', 'reports', [], shouldLoadData ? user : null);
     const [manualTheme, setManualTheme] = useFirestoreDoc('config', 'theme', 'default', shouldLoadData ? user : null);
 
-    // 🔥 LÓGICA ESTRICTA: SOLO LEE 'value' 🔥
-    const [rawWalletData, setRawWalletData, loadingCoins] = useFirestoreDoc('data', 'wallet', 0, shouldLoadData ? user : null);
+    const [rawWalletData, setRawWalletData, loadingCoins] = useFirestoreDoc('data', 'wallet', { 
+    val: { value: 0, coins: 0, lofiCoins: 0 } 
+}, shouldLoadData ? user : null);
 
     const lofiCoins = useMemo(() => {
         // 1. Si no hay datos, mostramos 0
@@ -147,7 +148,14 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
 
     // Al guardar, actualizamos todo para mantener consistencia, pero la App solo leerá 'value'
     const setLofiCoins = (newValue) => {
-        setRawWalletData({ value: newValue, coins: newValue, lofiCoins: newValue });
+        // 🔥 AL GUARDAR: Escribimos SOLO dentro de 'val'
+        setRawWalletData({
+            val: {
+                value: newValue,
+                coins: newValue,
+                lofiCoins: newValue
+            }
+        });
     };
     // 🔥 FIN LÓGICA ESTRICTA 🔥
 
