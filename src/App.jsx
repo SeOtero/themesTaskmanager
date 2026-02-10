@@ -126,53 +126,65 @@ const App = () => {
 const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfile }) => {
     const shouldLoadData = !loading && user;
 // --- ESTADOS FIREBASE ---
-    // Leemos la data tal cual (sin escribir nada automáticamente al cargar para no ensuciar)
-    const [rawWalletData, , loadingCoins] = useFirestoreDoc('data', 'wallet', { val: { value: 0 } }, shouldLoadData ? user : null);
+    const [pastReports, setPastReports] = useFirestoreDoc('data', 'reports', [], shouldLoadData ? user : null);
+    const [manualTheme, setManualTheme] = useFirestoreDoc('config', 'theme', 'default', shouldLoadData ? user : null);
 
-    // LECTURA: Buscamos el valor donde sea que esté (anidado o raíz)
+    // 🔥 BILLETERA: VERSIÓN APLANADORA DE ERRORES 🔥
+    // Inicializamos con null para detectar si cargó o no
+    const [rawWalletData, setRawWalletData, loadingCoins] = useFirestoreDoc('data', 'wallet', null, shouldLoadData ? user : null);
+
     const lofiCoins = useMemo(() => {
         if (!rawWalletData) return 0;
-        // Prioridad 1: Doble anidado (Error Matrioshka) -> Lo leemos para rescatar el valor
-        if (rawWalletData.val && rawWalletData.val.val) return Number(rawWalletData.val.val.value) || 0;
-        // Prioridad 2: Anidado correcto
-        if (rawWalletData.val) return Number(rawWalletData.val.value) || 0;
-        // Prioridad 3: Raíz (Viejo)
+
+        // 1. DETECTOR DE ERRORES (Matrioshka):
+        // Si existe val.val, significa que se anidó doble por error. Leemos el de más adentro (el real).
+        if (rawWalletData.val && rawWalletData.val.val) {
+            return Number(rawWalletData.val.val.value) || 0;
+        }
+
+        // 2. Lectura Normal (Estructura correcta)
+        if (rawWalletData.val) {
+            return Number(rawWalletData.val.value) || 0;
+        }
+
+        // 3. Lectura Antigua (Raíz)
         return Number(rawWalletData.value) || 0;
     }, [rawWalletData]);
 
-    // ESCRITURA MANUAL (Bypass del Hook):
-    // Usamos la función nativa de Firebase para asegurar la estructura exacta.
+
+    // 🔧 FUNCIÓN DE GUARDADO "APLANADORA"
+    // Esta función reescribe TODO el documento con la estructura limpia.
+    // Elimina las anidaciones dobles automáticamente la próxima vez que el usuario gane/gaste monedas.
     const setLofiCoins = async (newValue) => {
         if (!user || !user.uid) return;
 
-        try {
-            const walletRef = doc(db, 'users', user.uid, 'data', 'wallet');
-            
-            // ESTA ES LA ESTRUCTURA FINAL Y LIMPIA QUE QUEREMOS:
-            const cleanData = {
-                val: {
-                    value: newValue,
-                    coins: newValue,
-                    lofiCoins: newValue
-                },
-                // Mantenemos la raíz sincronizada por seguridad, pero SIN anidar
+        // Estructura PERFECTA que queremos en la base de datos
+        const cleanData = {
+            val: {
                 value: newValue,
                 coins: newValue,
                 lofiCoins: newValue
-            };
+            },
+            // Mantenemos la raíz sincronizada pero PLANA
+            value: newValue,
+            coins: newValue,
+            lofiCoins: newValue
+        };
 
-            // setDoc con merge: true actualiza los campos planos.
-            // Al pasarle 'val' como objeto completo, REEMPLAZA el contenido de 'val'.
-            // NO crea 'val.val'.
-            await setDoc(walletRef, cleanData); // Si quieres borrar todo lo viejo, quita { merge: true }
-            
-            // Forzamos actualización visual local rápida (opcional, si el hook tarda en reaccionar)
-            // setRawWalletData(cleanData); <--- NO LO USES, deja que Firebase notifique el cambio.
-            
+        try {
+            // 🔥 CLAVE DEL ÉXITO: 
+            // Usamos setDoc SIN "merge". Esto BORRA cualquier basura vieja (como val.val) 
+            // y deja solo lo que definimos en cleanData.
+            const walletRef = doc(db, 'users', user.uid, 'data', 'wallet');
+            await setDoc(walletRef, cleanData);
+
+            // Actualizamos el estado local para que la barra cambie al instante
+            setRawWalletData(cleanData); 
         } catch (error) {
-            console.error("Error guardando monedas:", error);
+            console.error("Error limpiando billetera:", error);
         }
     };
+    // 🔥 FIN CORRECCIÓN 🔥
 
     const [hourlyRate, setHourlyRate] = useFirestoreDoc('config', 'hourlyRate', '', shouldLoadData ? user : null);
     const [weeklyGoal, setWeeklyGoal] = useFirestoreDoc('config', 'weeklyGoal', 10, shouldLoadData ? user : null);
