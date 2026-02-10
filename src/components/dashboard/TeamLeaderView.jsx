@@ -277,27 +277,37 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
     const generateMondaySummary = () => { const visibleIdeas = teamIdeas.filter(i => i.type === 'monday' && !i.isArchived); const approvedIdeas = visibleIdeas.filter(i => i.status === 'approved'); if (approvedIdeas.length === 0) { alert("No hay ideas aprobadas."); return; } const range = getDateRange(); let summary = `📋 *RESUMEN DE IDEAS*\n📅 Periodo: ${range.start} al ${range.end}\n━━━━━━━━━━━━━━━━\n\n`; approvedIdeas.forEach((idea, index) => { summary += `💡 *TEMA #${index + 1}* (${idea.userName})\n📝 "${idea.content}"\n\n`; }); setSummaryText(summary); setShowSummaryModal(true); };
     const handleSendIdea = async () => { if (!newIdeaText.trim()) return; const currentUser = auth.currentUser; if (!currentUser) return; const now = new Date(); const timestampStr = now.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); const newIdea = { uid: currentUser.uid, userName: currentUser.displayName || currentUser.email || "Admin", team: currentUserTeam || 'admin', content: newIdeaText, type: newIdeaType, timestamp: Date.now(), timestampStr: timestampStr, analysis: { pros: "", cons: "" }, status: "new", isArchived: false }; try { await addDoc(collection(db, "monday_ideas"), newIdea); setNewIdeaText(""); alert("Enviado."); setIsSendIdeaModalOpen(false); fetchIdeas(); } catch (e) { alert("Error."); } };
     
-    // --- CORRECCIÓN 1: APROBAR IDEA (ACTUALIZA TODOS LOS CAMPOS POSIBLES) ---
-    const handleIdeaVerdict = async (idea, verdict) => { 
+const handleIdeaVerdict = async (idea, verdict) => { 
         if (idea.status !== 'new') return; 
+        
+        if (!idea.uid) { alert("Error: La idea no tiene UID asociado."); return; }
+
         try { 
             if (verdict === 'approved') { 
                 await updateDoc(doc(db, "monday_ideas", idea.id), { status: 'approved' }); 
-                // Asegurar que la billetera exista y actualizar TODOS los campos
+                
                 const walletRef = doc(db, "users", idea.uid, "data", "wallet");
+                
+                // 🔥 CAMBIO AQUÍ: Usamos comillas para entrar en 'val'
                 await setDoc(walletRef, { 
-                    value: increment(50),      // Para hooks genéricos
-                    lofiCoins: increment(50),  // Por si acaso
-                    coins: increment(50)       // Por si acaso
+                    "val.value": increment(50),      
+                    "val.coins": increment(50),
+                    "val.lofiCoins": increment(50),
+                    // (Opcional) Actualizamos también la raíz para que no quede desfasado
+                    value: increment(50),
+                    coins: increment(50),
+                    lofiCoins: increment(50)
                 }, { merge: true }); 
-                alert("✅ Aprobada +50 Coins"); 
+                
+                alert("✅ Aprobada +50 Coins (Sumados en 'val')"); 
             } else { 
                 await updateDoc(doc(db, "monday_ideas", idea.id), { status: 'rejected' }); 
                 alert("Rechazada."); 
             } 
             setTeamIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, status: verdict } : i)); 
         } catch (error) { 
-            alert(`Error: ${error.message}`); 
+            console.error("Error completo:", error);
+            alert(`Error de permisos o red: ${error.message}`); 
         } 
     };
     const handleArchiveIdea = async (ideaId) => { if (!window.confirm("¿Archivar?")) return; try { await updateDoc(doc(db, "monday_ideas", ideaId), { isArchived: true }); setTeamIdeas(prev => prev.map(i => i.id === ideaId ? { ...i, isArchived: true } : i)); } catch (e) { alert("Error."); } };
@@ -319,25 +329,32 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
         } catch (e) { alert("Error al guardar."); } 
     };
 
-    // --- CORRECCIÓN 2: DAR PUNTOS MANUALMENTE (ACTUALIZA TODOS LOS CAMPOS) ---
     const handleGivePoints = async (userId) => {
         const amount = parseInt(pointsToSend);
-        if (!amount || amount === 0) return alert("Ingresa una cantidad válida.");
+        if (!amount || isNaN(amount) || amount === 0) return alert("Ingresa una cantidad válida.");
         
+        if (!userId) return alert("Error: ID de usuario inválido.");
+
         try {
+            console.log(`Intentando dar ${amount} puntos a: ${userId}`);
             const walletRef = doc(db, "users", userId, "data", "wallet");
-            // Actualizamos 'value', 'lofiCoins' y 'coins' para cubrir todas las bases
+            
+            // 🔥 CAMBIO AQUÍ: Apuntamos dentro de 'val'
             await setDoc(walletRef, {
-                value: increment(amount),      // Este es el que probablemente lee tu hook
-                lofiCoins: increment(amount),  
-                coins: increment(amount) 
+                "val.value": increment(amount),      
+                "val.coins": increment(amount),
+                "val.lofiCoins": increment(amount),
+                // (Opcional) Actualizamos también la raíz
+                value: increment(amount),
+                coins: increment(amount),
+                lofiCoins: increment(amount)
             }, { merge: true });
             
-            alert(`✅ Se enviaron ${amount} monedas al usuario.`);
+            alert(`✅ Se enviaron ${amount} monedas (en 'val') al usuario.`);
             setPointsToSend(0);
         } catch (e) {
-            console.error(e);
-            alert("Error al enviar puntos. Revisa permisos.");
+            console.error("Error al enviar puntos:", e);
+            alert(`Error: ${e.message}. Revisa la consola (F12) para más detalles.`);
         }
     };
 
