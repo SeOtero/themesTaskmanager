@@ -3,14 +3,14 @@ import { collection, query, where, getDocs, getDoc, doc, updateDoc, setDoc, incr
 import { db, auth } from '../../firebase'; 
 import { getNextWeekID } from '../../utils/helpers'; 
 
-// --- 1. LISTA DE TAREAS REORDENADA (Según Feedback) ---
+// --- LISTA DE TAREAS ---
 const KNOWN_TASKS = [
     "Columna CONFIRMADO", 
-    "Columna UPSELL",           // Antes "Por T. o Por LL."
+    "Columna UPSELL", 
     "Columna DATOS ENTREGA",
     "Columna RESPONDER", 
     "Columna REMINDER",
-    "Chat en vivo (filtro Pendiente)", // Agrupado cerca de Reminder
+    "Chat en vivo (filtro Pendiente)",
     "Columna LATE VERIFICATION", 
     "Chat en vivo (filtro Abiertos)",
     "Ordenes confirmadas sheet (CHECK info)",
@@ -82,28 +82,26 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
     const [quizzes, setQuizzes] = useState([]);
     const [editingQuiz, setEditingQuiz] = useState(null);
 
-    // Users
+    // Users & Points
     const [usersList, setUsersList] = useState([]);
     const [editingUserId, setEditingUserId] = useState(null);
     const [editForm, setEditForm] = useState({ role: '', team: '' });
+    const [pointsToSend, setPointsToSend] = useState(0); // Estado para los puntos manuales
 
     // --- CARGA DE DATOS ---
     useEffect(() => {
         const loadData = async () => {
-            // 1. Cargar Usuarios
             const uSnap = await getDocs(collection(db, "users"));
             const allUsers = uSnap.docs.map(d => ({id:d.id, ...d.data()}));
             setUsersList(allUsers);
             setSquad(allUsers); 
 
-            // 2. Cargar Plan Semanal
             try {
                 const planRef = doc(db, "weekly_plans", nextWeekId);
                 const planSnap = await getDoc(planRef); 
                 if (planSnap.exists()) setWeeklyPlan(planSnap.data().plan || {});
             } catch (e) { console.error("Error loading plan:", e); }
 
-            // 3. Cargar Horarios
             try {
                 const sQuery = query(collection(db, 'weekly_schedules'), where('weekId', '==', nextWeekId));
                 const sSnap = await getDocs(sQuery);
@@ -112,19 +110,14 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
                 setAgentSchedules(schedulesMap);
             } catch (e) { console.error("Error loading schedules:", e); }
 
-            // 4. Solicitudes
             const reqUnsub = onSnapshot(query(collection(db, "schedule_requests"), where("status", "==", "pending")), (snap) => {
                 setScheduleRequests(snap.docs.map(d => ({id: d.id, ...d.data()})));
             });
 
-            // 5. News & Quiz
             const newsUnsub = onSnapshot(query(collection(db, "news_ticker"), orderBy("createdAt", "desc")), (snap) => setNewsList(snap.docs.map(d => ({id: d.id, ...d.data()}))));
             const quizUnsub = onSnapshot(collection(db, "training_modules"), (snap) => setQuizzes(snap.docs.map(d => ({id: d.id, ...d.data()}))));
 
-            // 6. Dashboard Data 
             if (activeTab === 'dashboard') fetchTeamData();
-            
-            // 7. Ideas
             if (activeTab === 'ideas' || activeTab === 'dev') fetchIdeas();
 
             return () => { reqUnsub(); newsUnsub(); quizUnsub(); };
@@ -168,19 +161,14 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
                 updatedAt: Date.now()
             }, { merge: true });
 
-        } catch (err) { 
-            console.error("Error saving plan:", err); 
-            alert("⚠️ Error de Permisos: Revisa las reglas de Firebase."); 
-        }
+        } catch (err) { console.error(err); alert("Error de permisos."); }
     };
 
     const removeAssign = async (taskName, shopName, agentId) => {
         const newPlan = { ...weeklyPlan };
         newPlan[selectedPlanDay][taskName][shopName] = newPlan[selectedPlanDay][taskName][shopName].filter(a => a.id !== agentId);
         setWeeklyPlan(newPlan);
-        try {
-            await setDoc(doc(db, "weekly_plans", nextWeekId), { plan: newPlan }, { merge: true });
-        } catch (err) { console.error(err); }
+        try { await setDoc(doc(db, "weekly_plans", nextWeekId), { plan: newPlan }, { merge: true }); } catch (err) { console.error(err); }
     };
 
     // --- DASHBOARD FUNCTIONS ---
@@ -257,7 +245,7 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
     const toggleRow = (id) => setExpandedReportId(expandedReportId === id ? null : id);
     const formatTime = (ms) => { if (!ms) return '0h 0m'; const h = Math.floor(ms / 3600000); const m = Math.floor((ms % 3600000) / 60000); return `${h}h ${m}m`; };
     
-    // --- FUNCIÓN DE FILTRADO (DEJA QUE FUNCIONE LA PESTAÑA DEV) ---
+    // --- FILTRADO DE IDEAS ---
     const getFilteredIdeas = () => {
         const range = getDateRange();
         let filtered = teamIdeas;
@@ -288,16 +276,66 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
     // --- HANDLERS IDEAS ---
     const generateMondaySummary = () => { const visibleIdeas = teamIdeas.filter(i => i.type === 'monday' && !i.isArchived); const approvedIdeas = visibleIdeas.filter(i => i.status === 'approved'); if (approvedIdeas.length === 0) { alert("No hay ideas aprobadas."); return; } const range = getDateRange(); let summary = `📋 *RESUMEN DE IDEAS*\n📅 Periodo: ${range.start} al ${range.end}\n━━━━━━━━━━━━━━━━\n\n`; approvedIdeas.forEach((idea, index) => { summary += `💡 *TEMA #${index + 1}* (${idea.userName})\n📝 "${idea.content}"\n\n`; }); setSummaryText(summary); setShowSummaryModal(true); };
     const handleSendIdea = async () => { if (!newIdeaText.trim()) return; const currentUser = auth.currentUser; if (!currentUser) return; const now = new Date(); const timestampStr = now.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); const newIdea = { uid: currentUser.uid, userName: currentUser.displayName || currentUser.email || "Admin", team: currentUserTeam || 'admin', content: newIdeaText, type: newIdeaType, timestamp: Date.now(), timestampStr: timestampStr, analysis: { pros: "", cons: "" }, status: "new", isArchived: false }; try { await addDoc(collection(db, "monday_ideas"), newIdea); setNewIdeaText(""); alert("Enviado."); setIsSendIdeaModalOpen(false); fetchIdeas(); } catch (e) { alert("Error."); } };
-    const handleIdeaVerdict = async (idea, verdict) => { if (idea.status !== 'new') return; try { if (verdict === 'approved') { await updateDoc(doc(db, "monday_ideas", idea.id), { status: 'approved' }); const walletRef = doc(db, "users", idea.uid, "data", "wallet"); try { await updateDoc(walletRef, { value: increment(50), coins: increment(50), lofiCoins: increment(50) }); } catch { await setDoc(walletRef, { coins: 50, lofiCoins: 50 }); } alert("✅ Aprobada +50 Coins"); } else { await updateDoc(doc(db, "monday_ideas", idea.id), { status: 'rejected' }); alert("Rechazada."); } setTeamIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, status: verdict } : i)); } catch (error) { alert(`Error: ${error.message}`); } };
+    const handleIdeaVerdict = async (idea, verdict) => { 
+        if (idea.status !== 'new') return; 
+        try { 
+            if (verdict === 'approved') { 
+                await updateDoc(doc(db, "monday_ideas", idea.id), { status: 'approved' }); 
+                // Asegurar que la billetera exista
+                const walletRef = doc(db, "users", idea.uid, "data", "wallet");
+                await setDoc(walletRef, { 
+                    lofiCoins: increment(50), 
+                    coins: increment(50) 
+                }, { merge: true }); 
+                alert("✅ Aprobada +50 Coins"); 
+            } else { 
+                await updateDoc(doc(db, "monday_ideas", idea.id), { status: 'rejected' }); 
+                alert("Rechazada."); 
+            } 
+            setTeamIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, status: verdict } : i)); 
+        } catch (error) { 
+            alert(`Error: ${error.message}`); 
+        } 
+    };
     const handleArchiveIdea = async (ideaId) => { if (!window.confirm("¿Archivar?")) return; try { await updateDoc(doc(db, "monday_ideas", ideaId), { isArchived: true }); setTeamIdeas(prev => prev.map(i => i.id === ideaId ? { ...i, isArchived: true } : i)); } catch (e) { alert("Error."); } };
     const handleRestoreIdea = async (ideaId) => { try { await updateDoc(doc(db, "monday_ideas", ideaId), { isArchived: false }); setTeamIdeas(prev => prev.map(i => i.id === ideaId ? { ...i, isArchived: false } : i)); } catch (e) { alert("Error."); } };
     const handleDeleteIdea = async (ideaId) => { if (!window.confirm("⚠️ ¿ELIMINAR DEFINITIVAMENTE?")) return; try { await deleteDoc(doc(db, "monday_ideas", ideaId)); setTeamIdeas(prev => prev.filter(idea => idea.id !== ideaId)); } catch (e) { alert("Error."); } };
     const handleSaveAnalysis = async (ideaId, newAnalysis) => { try { await updateDoc(doc(db, "monday_ideas", ideaId), { analysis: newAnalysis }); alert("Guardado."); } catch (e) { alert("Error."); } };
     const handleAnalysisChange = (id, field, value) => { setTeamIdeas(prev => prev.map(idea => { if (idea.id === id) return { ...idea, analysis: { ...(idea.analysis || {pros:'', cons:''}), [field]: value } }; return idea; })); };
 
-    // --- HANDLERS USUARIOS ---
+    // --- HANDLERS USUARIOS Y PUNTOS MANUALES ---
     const startEditingUser = (user) => { setEditingUserId(user.id); setEditForm({ role: user.role || 'agent', team: user.team || 'default' }); };
-    const saveUserChanges = async (userId) => { if (userId === auth.currentUser.uid && editForm.role !== 'admin') { alert("No puedes quitarte tus permisos."); return; } try { await updateDoc(doc(db, 'users', userId), { role: editForm.role, team: editForm.team }); setUsersList(prev => prev.map(u => u.id === userId ? { ...u, ...editForm } : u)); setEditingUserId(null); alert("Guardado."); } catch (e) { alert("Error al guardar."); } };
+    
+    const saveUserChanges = async (userId) => { 
+        if (userId === auth.currentUser.uid && editForm.role !== 'admin') { alert("No puedes quitarte tus permisos."); return; } 
+        try { 
+            await updateDoc(doc(db, 'users', userId), { role: editForm.role, team: editForm.team }); 
+            setUsersList(prev => prev.map(u => u.id === userId ? { ...u, ...editForm } : u)); 
+            setEditingUserId(null); 
+            alert("Guardado."); 
+        } catch (e) { alert("Error al guardar."); } 
+    };
+
+    // 🔥 NUEVA FUNCIÓN: DAR PUNTOS MANUALMENTE
+    const handleGivePoints = async (userId) => {
+        const amount = parseInt(pointsToSend);
+        if (!amount || amount === 0) return alert("Ingresa una cantidad válida.");
+        
+        try {
+            const walletRef = doc(db, "users", userId, "data", "wallet");
+            // Usamos setDoc con merge para crear la billetera si no existe
+            await setDoc(walletRef, {
+                lofiCoins: increment(amount),
+                coins: increment(amount) // Por si acaso usas 'coins' en otro lado
+            }, { merge: true });
+            
+            alert(`✅ Se enviaron ${amount} monedas al usuario.`);
+            setPointsToSend(0);
+        } catch (e) {
+            console.error(e);
+            alert("Error al enviar puntos. Revisa permisos.");
+        }
+    };
 
     return (
         <div className="min-h-screen w-full bg-slate-950 text-white font-inter animate-fadeIn pb-20 relative overflow-x-hidden selection:bg-indigo-500 selection:text-white">
@@ -312,10 +350,7 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
                     </div>
                     <div className="flex gap-3">
                         <button onClick={() => setIsGoalsModalOpen(true)} className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-white/5 transition-all flex items-center gap-2 hover:text-white"><span>🎯</span> METAS</button>
-                        {/* 🔥 2. BOTÓN ATRÁS (Azul) */}
-                        <button onClick={onLogout} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold border border-blue-500/20 transition-all flex items-center gap-2">
-                            ⬅ ATRÁS
-                        </button>
+                        <button onClick={onLogout} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold border border-blue-500/20 transition-all flex items-center gap-2">⬅ ATRÁS</button>
                     </div>
                 </div>
             </div>
@@ -371,7 +406,7 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
                     </div>
                 )}
 
-                {/* 2. PLANNER (CON ANCHO DE COLUMNA AJUSTADO) */}
+                {/* 2. PLANNER */}
                 {activeTab === 'planner' && (
                     <div className="flex gap-6 h-[75vh] animate-fadeIn">
                         
@@ -416,7 +451,7 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
                             </button>
                         </div>
                         
-                        {/* TABLA PRINCIPAL (Con Scroll Horizontal y ancho mínimo) */}
+                        {/* TABLA PRINCIPAL */}
                         <div className="flex-1 flex flex-col bg-slate-900 border border-white/10 rounded-xl overflow-hidden shadow-2xl">
                             <div className="flex bg-black/40 border-b border-white/10">
                                 {WEEK_DAYS.map(d => (
@@ -555,7 +590,7 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
                     </div>
                 )}
 
-                {/* 6. USUARIOS */}
+                {/* 6. USUARIOS Y PUNTOS */}
                 {activeTab === 'users' && isAdmin && (
                     <div className="max-w-7xl mx-auto animate-fadeIn">
                        <div className="bg-slate-900 border border-white/10 rounded-xl overflow-hidden shadow-xl">
@@ -566,7 +601,18 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
                                         <tr key={user.id} className="hover:bg-white/[0.02]">
                                             <td className="p-4"><div className="font-bold text-white">{user.name}</div><div className="text-xs text-slate-500">{user.email}</div></td>
                                             {editingUserId === user.id ? (
-                                                <><td className="p-4"><select value={editForm.role} onChange={e=>setEditForm({...editForm, role:e.target.value})} className="bg-slate-950 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none focus:border-indigo-500"><option value="agent">Agente</option><option value="team_leader">TL</option><option value="admin">Admin</option><option value="tester">Tester</option></select></td><td className="p-4"><select value={editForm.team} onChange={e=>setEditForm({...editForm, team:e.target.value})} className="bg-slate-950 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none focus:border-indigo-500"><option value="default">Default</option><option value="team1">Team 1</option><option value="team2">Team 2</option></select></td><td className="p-4 text-right"><button onClick={()=>saveUserChanges(user.id)} className="text-green-400 text-xs font-bold mr-3 hover:underline">GUARDAR</button><button onClick={()=>setEditingUserId(null)} className="text-red-400 text-xs font-bold hover:underline">CANCELAR</button></td></>
+                                                <>
+                                                    <td className="p-4"><select value={editForm.role} onChange={e=>setEditForm({...editForm, role:e.target.value})} className="bg-slate-950 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none focus:border-indigo-500"><option value="agent">Agente</option><option value="team_leader">TL</option><option value="admin">Admin</option><option value="tester">Tester</option></select></td>
+                                                    <td className="p-4"><select value={editForm.team} onChange={e=>setEditForm({...editForm, team:e.target.value})} className="bg-slate-950 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none focus:border-indigo-500"><option value="default">Default</option><option value="team1">Team 1</option><option value="team2">Team 2</option></select></td>
+                                                    <td className="p-4 text-right flex items-center justify-end gap-2">
+                                                        <div className="flex items-center bg-black/20 rounded-lg p-1 border border-white/5">
+                                                            <input type="number" placeholder="Bonus" className="w-16 bg-transparent text-xs text-yellow-400 text-center outline-none" onChange={(e) => setPointsToSend(e.target.value)} />
+                                                            <button onClick={() => handleGivePoints(user.id)} className="bg-yellow-600 text-black px-2 py-1 rounded text-[10px] font-bold hover:bg-yellow-500">➕ ENVIAR</button>
+                                                        </div>
+                                                        <button onClick={()=>saveUserChanges(user.id)} className="text-green-400 text-xs font-bold hover:underline ml-2">GUARDAR</button>
+                                                        <button onClick={()=>setEditingUserId(null)} className="text-red-400 text-xs font-bold hover:underline ml-2">CANCELAR</button>
+                                                    </td>
+                                                </>
                                             ) : (
                                                 <><td className="p-4"><span className={`text-[10px] uppercase font-bold px-2 py-1 rounded border ${user.role === 'admin' ? 'bg-purple-900/30 text-purple-300 border-purple-500/30' : user.role === 'team_leader' ? 'bg-blue-900/30 text-blue-300 border-blue-500/30' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>{user.role}</span></td><td className="p-4 text-xs text-slate-400">{user.team}</td><td className="p-4 text-right"><button onClick={()=>startEditingUser(user)} className="text-indigo-400 text-xs font-bold hover:text-white transition-colors">EDITAR ✏️</button></td></>
                                             )}
