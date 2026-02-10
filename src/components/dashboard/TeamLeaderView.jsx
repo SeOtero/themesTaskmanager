@@ -288,18 +288,19 @@ const handleIdeaVerdict = async (idea, verdict) => {
                 
                 const walletRef = doc(db, "users", idea.uid, "data", "wallet");
                 
-                // 🔥 CAMBIO AQUÍ: Usamos comillas para entrar en 'val'
+                // 🔥 CORRECCIÓN: Usamos updateDoc para entrar correctamente en 'val'
                 await updateDoc(walletRef, { 
                     "val.value": increment(50),      
                     "val.coins": increment(50),
                     "val.lofiCoins": increment(50),
-                    // (Opcional) Actualizamos también la raíz para que no quede desfasado
+                    
+                    // Actualizamos también la raíz para mantener todo igual
                     value: increment(50),
                     coins: increment(50),
                     lofiCoins: increment(50)
-                }, { merge: true }); 
+                }); 
                 
-                alert("✅ Aprobada +50 Coins (Sumados en 'val')"); 
+                alert("✅ Aprobada +50 Coins"); 
             } else { 
                 await updateDoc(doc(db, "monday_ideas", idea.id), { status: 'rejected' }); 
                 alert("Rechazada."); 
@@ -307,7 +308,7 @@ const handleIdeaVerdict = async (idea, verdict) => {
             setTeamIdeas(prev => prev.map(i => i.id === idea.id ? { ...i, status: verdict } : i)); 
         } catch (error) { 
             console.error("Error completo:", error);
-            alert(`Error de permisos o red: ${error.message}`); 
+            alert(`Error: ${error.message}`); 
         } 
     };
     const handleArchiveIdea = async (ideaId) => { if (!window.confirm("¿Archivar?")) return; try { await updateDoc(doc(db, "monday_ideas", ideaId), { isArchived: true }); setTeamIdeas(prev => prev.map(i => i.id === ideaId ? { ...i, isArchived: true } : i)); } catch (e) { alert("Error."); } };
@@ -336,25 +337,25 @@ const handleIdeaVerdict = async (idea, verdict) => {
         if (!userId) return alert("Error: ID de usuario inválido.");
 
         try {
-            console.log(`Intentando dar ${amount} puntos a: ${userId}`);
             const walletRef = doc(db, "users", userId, "data", "wallet");
             
-            // 🔥 CAMBIO AQUÍ: Apuntamos dentro de 'val'
-            await updateDocDoc(walletRef, {
+            // 🔥 CORRECCIÓN: Usamos updateDoc
+            await updateDoc(walletRef, {
                 "val.value": increment(amount),      
                 "val.coins": increment(amount),
                 "val.lofiCoins": increment(amount),
-                // (Opcional) Actualizamos también la raíz
+                
+                // Actualizamos también la raíz
                 value: increment(amount),
                 coins: increment(amount),
                 lofiCoins: increment(amount)
-            }, { merge: true });
+            });
             
-            alert(`✅ Se enviaron ${amount} monedas (en 'val') al usuario.`);
+            alert(`✅ Se enviaron ${amount} monedas al usuario.`);
             setPointsToSend(0);
         } catch (e) {
             console.error("Error al enviar puntos:", e);
-            alert(`Error: ${e.message}. Revisa la consola (F12) para más detalles.`);
+            alert(`Error: ${e.message}`);
         }
     };
 

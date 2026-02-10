@@ -23,7 +23,7 @@ const EconomyBar = ({ coins, onOpenShop }) => {
                     </div>
                     
                     <div className="flex flex-col">
-                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none">Balance</span>
+                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none">Lofi Coins</span>
                         <span className="text-base font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-300 leading-tight tabular-nums">
                             {/* ✅ USAMOS LA VARIABLE SEGURA AQUÍ */}
                             {displayCoins.toLocaleString()}
