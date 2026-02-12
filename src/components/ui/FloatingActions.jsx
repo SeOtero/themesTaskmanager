@@ -19,7 +19,7 @@ const FloatingActions = ({
                 onClick={() => { setIdeaType('dev'); onOpenIdeas(); }} 
                 className="fixed bottom-20 right-4 z-50 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2.5 rounded-full shadow-lg text-xs font-bold transition-transform active:scale-95 flex items-center gap-2"
             >
-                <span>👨‍💻</span><span>BUGS / DEV</span>
+                <span>👨‍💻</span><span>BUGS / IDEAS APP</span>
             </button>
             
             <button 

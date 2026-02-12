@@ -9,15 +9,16 @@ import ForestFlora from './ForestFlora';
 import GoldenDust from './GoldenDust';
 import ShootingStars from './ShootingStars';
 import SnowEffect from './SnowEffect';
+import { BackgroundAudio, BackgroundRain } from './BackgroundEffects';
 
 // --- IMPORTS DE EFECTOS DE TEMPORADA ---
 import GhostEffect from './GhostEffect';
 import ValentineHearts from './ValentineHearts';
 import ChristmasLights from './ChristmasLights';
 import MickeyConfetti from './MickeyConfetti';
+import NeonCityBackground from './NeonCityBackground';
+import NekoCozyBackground from './NekoCozyBackground';
 
-// Importamos audio si lo tienes en otro lado o lo definimos
-import { BackgroundAudio } from './BackgroundEffects';
 
 // --- 2. EL EFECTO DE MICKEY (Lo mantenemos) ---
 const MickeyConfettiEffect = () => {
@@ -57,6 +58,10 @@ const BackgroundEffectsManager = ({ themeClasses, activeEffect }) => {
         'ghost': GhostEffect,           // <--- Aquí se usa la variable (dejará de estar gris)
         'valentine_hearts': ValentineHearts,
         'lights': ChristmasLights,
+        'rain': BackgroundRain,
+        'neon_grid': NeonCityBackground,
+        'neko_pattern': NekoCozyBackground,
+        
                
         // Efectos nuevos
         'mickey_confetti': MickeyConfettiEffect,
@@ -123,10 +128,21 @@ const BackgroundEffectsManager = ({ themeClasses, activeEffect }) => {
     };
 
     return (
-        <>
-            {renderEffects()}
-            {themeClasses.name === 'lofi' && <BackgroundAudio />} 
-        </>
+       <>
+        {/* FONDO BASE (Estrellas o textura) */}
+        <div 
+            className="fixed inset-0 pointer-events-none -z-10 mix-blend-overlay opacity-[0.05]" 
+            style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/stardust.png")' }}
+        ></div>
+
+        {/* CONTENEDOR DE EFECTOS - ¡IMPORTANTE: pointer-events-none! */}
+        <div className="fixed inset-0 pointer-events-none z-0"> 
+             {renderEffects()}
+        </div>
+        
+        {/* Audio Lofi (Invisible) */}
+        {themeClasses.name === 'lofi' && <BackgroundAudio />} 
+    </>
     );
 };
 

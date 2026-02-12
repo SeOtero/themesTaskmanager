@@ -6,8 +6,8 @@ import { getNextWeekID } from '../../utils/helpers';
 const AvailabilityModal = ({ isOpen, onClose, user, userProfile, addCoins, logEvent }) => {
     // Estado local del formulario
     const [weekForm, setWeekForm] = useState({ 
-        Monday: { hours: 0, off: false }, Tuesday: { hours: 0, off: false }, Wednesday: { hours: 0, off: false }, 
-        Thursday: { hours: 0, off: false }, Friday: { hours: 0, off: false }, Saturday: { hours: 0, off: true }, Sunday: { hours: 0, off: true } 
+        LUNES: { hours: 0, off: false }, MARTES: { hours: 0, off: false }, MIÉRCOLES: { hours: 0, off: false }, 
+        JUEVES: { hours: 0, off: false }, VIERNES: { hours: 0, off: false }, SÁBADO: { hours: 0, off: true }, DOMINGO: { hours: 0, off: true } 
     });
 
     const handleSend = async () => {

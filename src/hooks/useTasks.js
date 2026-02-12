@@ -12,7 +12,8 @@ export const useTasks = (user) => {
     useEffect(() => {
         const interval = setInterval(() => {
             if (tasks && tasks.some(t => t.running)) {
-                setTasks(prev => [...prev]); // Forzamos re-render
+                // Forzamos re-render pasando una copia nueva del array
+                setTasks([...tasks]); 
             }
         }, 1000);
         return () => clearInterval(interval);
@@ -67,7 +68,11 @@ export const useTasks = (user) => {
     }, [addMultipleTasks]);
     
     const deleteTask = useCallback((id) => setTasks(tasks.filter(t => t.id !== id)), [tasks, setTasks]);
-    const deleteAllTasks = useCallback(() => { setTasks([]); setErrorMessage(''); }, [setTasks]);
+    
+    const deleteAllTasks = useCallback(() => { 
+        setTasks([]); 
+        setErrorMessage(''); 
+    }, [setTasks]);
     
     const toggleTimer = useCallback((id) => {
         const now = Date.now();
@@ -96,15 +101,26 @@ export const useTasks = (user) => {
             return t;
         });
 
-        if (!tasksStopped) { setStatusMessage({ text: 'No hay tareas activas.', taskIdToResume: null }); return; }
+        if (!tasksStopped) { 
+            setStatusMessage({ text: 'No hay tareas activas.', taskIdToResume: null }); 
+            return; 
+        }
+        
         setTasks(newTasks);
         setStatusMessage({ text: `Tareas detenidas.`, taskIdToResume: lastRunningTaskId });
     }, [tasks, setTasks]);
 
-    const resumeStoppedTimers = useCallback(() => { if (!statusMessage || statusMessage.taskIdToResume === null) return; toggleTimer(statusMessage.taskIdToResume); setStatusMessage(null); }, [statusMessage, toggleTimer]);
+    const resumeStoppedTimers = useCallback(() => { 
+        if (!statusMessage || statusMessage.taskIdToResume === null) return; 
+        toggleTimer(statusMessage.taskIdToResume); 
+        setStatusMessage(null); 
+    }, [statusMessage, toggleTimer]);
+
     const clearStatusMessage = useCallback(() => { setStatusMessage(null); }, []);
     
-    const resetTaskTimer = useCallback((id) => { setTasks(tasks.map(t => t.id === id ? { ...t, elapsedTime: 0, running: false, lastTime: null, quantity: null } : t)); }, [tasks, setTasks]);
+    const resetTaskTimer = useCallback((id) => { 
+        setTasks(tasks.map(t => t.id === id ? { ...t, elapsedTime: 0, running: false, lastTime: null, quantity: null } : t)); 
+    }, [tasks, setTasks]);
     
     const updateTaskDetails = useCallback((id, newDetails) => {
         setTasks(tasks.map(t => {
@@ -121,65 +137,100 @@ export const useTasks = (user) => {
     const sortTasksByShop = useCallback(() => setTasks([...tasks].sort((a, b) => a.shop.localeCompare(b.shop))), [tasks, setTasks]);
     
     // -----------------------------------------------------------------------
-    // 🔥 LÓGICA CORREGIDA DEL SINCRONIZADOR DE TIEMPO
+    // ✅ CORRECCIÓN CRÍTICA: distributeTasksTime
+    // Calculamos el array nuevo completo ANTES de llamar a setTasks.
+    // Esto evita el error "Unsupported field value: a function" en Firebase.
     // -----------------------------------------------------------------------
-    const syncTasksTime = useCallback((targetTimeStr, mode, specificTaskId) => {
-        // 1. Calcular el tiempo objetivo en milisegundos (Soporta "HH:MM" y minutos enteros "100")
+    const distributeTasksTime = useCallback((taskIds, totalMs) => {
+        if (!taskIds || taskIds.length === 0) return;
+
+        const msPerTask = Math.floor(totalMs / taskIds.length);
+        const remainder = totalMs % taskIds.length;
+        let remainderApplied = false;
+
+        // Usamos 'tasks' directamente (que está en el scope del hook)
+        const updatedTasks = tasks.map(task => {
+            if (taskIds.includes(task.id)) {
+                let adjustment = msPerTask;
+
+                if (!remainderApplied) {
+                    adjustment += remainder;
+                    remainderApplied = true;
+                }
+
+                // Sumamos (o restamos si es negativo) y evitamos que baje de 0
+                const newTime = Math.max(0, task.elapsedTime + adjustment);
+                return { ...task, elapsedTime: newTime };
+            }
+            return task;
+        });
+
+        // ✅ Pasamos el array directo, NO una función
+        setTasks(updatedTasks);
+    }, [tasks, setTasks]);
+
+    // -----------------------------------------------------------------------
+    // ✅ CORRECCIÓN CRÍTICA: syncTasksTime
+    // Misma corrección: usar datos directos en lugar de setTasks(prev => ...)
+    // -----------------------------------------------------------------------
+    const syncTasksTime = useCallback((input, mode, specificTaskId) => {
+        // CASO 1: Ajuste directo por número (Diferencia total)
+        if (typeof input === 'number') {
+            const difference = input;
+            if (tasks.length === 0) return;
+            
+            const split = Math.floor(difference / tasks.length);
+            const remainder = difference % tasks.length;
+            let remainderApplied = false;
+
+            const updatedTasks = tasks.map((t, i) => {
+                let adjustment = split;
+                if (!remainderApplied) { adjustment += remainder; remainderApplied = true; }
+                const newTime = Math.max(0, t.elapsedTime + adjustment);
+                return { ...t, elapsedTime: newTime };
+            });
+            
+            setTasks(updatedTasks);
+            return;
+        }
+
+        // Modo Legacy (input texto)
         let targetMs = 0;
-        const strVal = targetTimeStr.toString().trim();
+        const strVal = input.toString().trim();
 
         if (strVal.includes(':')) {
-            // Formato HH:MM
             const parts = strVal.split(':');
             const h = parseInt(parts[0] || '0', 10);
             const m = parseInt(parts[1] || '0', 10);
             targetMs = (h * 3600 * 1000) + (m * 60 * 1000);
         } else {
-            // Formato Minutos (ej: "1000" o "90")
             const minutes = parseFloat(strVal);
-            if (!isNaN(minutes)) {
-                targetMs = minutes * 60 * 1000;
-            }
+            if (!isNaN(minutes)) targetMs = minutes * 60 * 1000;
         }
 
-        // 2. Obtener tiempo actual total de la app
         const currentTotalMs = tasks.reduce((acc, t) => acc + t.elapsedTime, 0);
-        
-        // 3. Calcular la diferencia exacta
         const difference = targetMs - currentTotalMs;
 
-        // Si la diferencia es casi cero, no hacemos nada
         if (Math.abs(difference) < 1000) return;
 
         let updatedTasks = [...tasks];
 
         if (mode === 'all') {
             if (updatedTasks.length === 0) return;
-
-            // Repartir uniformemente (división entera)
             const count = updatedTasks.length;
             const sharePerTask = Math.floor(difference / count);
-            const remainder = difference % count; // Lo que sobra se lo damos al primero
+            const remainder = difference % count;
 
             updatedTasks = updatedTasks.map((t, index) => {
-                let addAmount = sharePerTask;
-                
-                // Sumar el resto a la primera tarea para que la suma sea exacta
-                if (index === 0) addAmount += remainder;
-
-                let newTime = t.elapsedTime + addAmount;
-                // Protección: El tiempo nunca puede ser negativo
-                if (newTime < 0) newTime = 0;
-
+                let addAmount = sharePerTask + (index === 0 ? remainder : 0);
+                let newTime = Math.max(0, t.elapsedTime + addAmount);
                 return { ...t, elapsedTime: newTime };
             });
 
         } else if (mode === 'single' && specificTaskId) {
-            // Asignar toda la diferencia a una sola tarea
             updatedTasks = updatedTasks.map(t => {
                 if (t.id === specificTaskId) {
-                    let newTime = t.elapsedTime + difference;
-                    if (newTime < 0) newTime = 0;
+                    let newTime = Math.max(0, t.elapsedTime + difference);
                     return { ...t, elapsedTime: newTime };
                 }
                 return t;
@@ -187,16 +238,18 @@ export const useTasks = (user) => {
         }
 
         setTasks(updatedTasks);
-        console.log(`Sincronización completa. Objetivo: ${targetMs}ms, Diferencia aplicada: ${difference}ms`);
         
     }, [tasks, setTasks]);
 
     return { 
-        tasks, errorMessage, setErrorMessage, 
+        tasks, 
+        errorMessage, setErrorMessage, 
         addTask, addMultipleTasks, 
-        deleteTask, deleteAllTasks, toggleTimer, updateTaskDetails, 
+        deleteTask, deleteAllTasks, 
+        toggleTimer, updateTaskDetails, 
         sortTasksByShop, resetTaskTimer, stopAllTimers, 
         statusMessage, resumeStoppedTimers, clearStatusMessage, 
-        syncTasksTime 
+        syncTasksTime,
+        distributeTasksTime
     };
 };

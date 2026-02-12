@@ -14,7 +14,10 @@ const MarketplaceModal = ({
     if (!isOpen) return null;
 
     const filteredItems = MARKET_ITEMS.filter(item => item.category === filter);
-    const isOwned = (itemId) => ownedItems.includes(itemId) || itemId === 'default';
+    const isOwned = (itemId) => {
+        const item = MARKET_ITEMS.find(i => i.id === itemId);
+        return ownedItems.includes(itemId) || itemId === 'default' || (item && item.price === 0);
+    };
     
     const isActive = (item) => {
         if (item.category === 'theme') return currentTheme === item.id;
@@ -31,7 +34,7 @@ const MarketplaceModal = ({
     ];
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
             <div className="w-full max-w-6xl bg-[#0B0F19] rounded-3xl shadow-2xl border border-white/5 flex flex-col max-h-[85vh] overflow-hidden relative">
                 
                 {/* --- HEADER --- */}
