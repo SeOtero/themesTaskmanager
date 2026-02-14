@@ -1,4 +1,142 @@
 export const THEMES = {
+
+    // 1. SAN VALENTÍN (Actualizado)
+    // 1. SAN VALENTÍN (CORREGIDO: Fondo Infinito)
+    seasonal_valentines: {
+        id: 'seasonal_valentines',
+        name: 'valentines',
+        label: '💘 San Valentín',
+        hidden: true,
+        
+        bodyBg: 'bg-pink-950', // Fallback
+        
+        // ✅ SOLUCIÓN: Movemos el fondo aquí para que el sistema lo fije y estire automáticamente
+        rawBg: 'radial-gradient(circle at 50% 10%, #be185d 0%, #831843 40%, #000000 100%)',
+        
+        cardBg: 'bg-pink-900/60 backdrop-blur-md shadow-[0_0_40px_rgba(236,72,153,0.3)] border border-pink-500/30',
+        primaryText: 'text-pink-100',
+        secondaryText: 'text-pink-200',
+        accentText: 'text-white font-bold drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]',
+        
+        inputBorder: 'border-pink-500 focus:border-pink-300 bg-pink-900/50',
+        shopSelectBorder: 'border-pink-400',
+        
+        buttonAction: 'bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 text-white shadow-lg shadow-pink-900/50',
+        buttonAdd: 'bg-rose-600 hover:bg-rose-700 text-white shadow-md',
+        modalBg: 'bg-pink-950 border-pink-500',
+        
+        // Dejamos solo el cursor aquí
+        customCss: `
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="%23ec4899" stroke="white" stroke-width="1.5" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>') 0 0, auto !important;
+        `,
+        
+        activeEffects: ['valentine_hearts']
+    },
+
+    // 2. HALLOWEEN (Octubre)
+    seasonal_halloween: {
+        
+        name: 'halloween',
+        label: '🎃 Halloween',
+        hidden: true,
+        
+        bodyBg: 'bg-gray-950',
+        cardBg: 'bg-[#0a0a0a] shadow-2xl border border-orange-600/50',
+        primaryText: 'text-orange-500',
+        secondaryText: 'text-gray-400',
+        accentText: 'text-yellow-400 font-bold tracking-widest',
+        
+        inputBorder: 'border-gray-700 focus:border-orange-500 bg-gray-900',
+        shopSelectBorder: 'border-orange-500',
+        
+        buttonAction: 'bg-purple-700 hover:bg-purple-800 text-white border border-orange-500 shadow-[0_0_15px_rgba(255,165,0,0.4)]',
+        buttonAdd: 'bg-orange-600 hover:bg-orange-700 text-white',
+        modalBg: 'bg-gray-900 border-orange-600',
+        
+        customCss: `
+            background-image: repeating-linear-gradient(45deg, #1a1a1a 0, #1a1a1a 10px, #0f0f0f 10px, #0f0f0f 20px);
+            @keyframes subtle-container-glow { 0%, 100% { box-shadow: 0 0 15px rgba(255, 140, 0, 0.4), 0 0 5px rgba(128, 0, 128, 0.2); } 50% { box-shadow: 0 0 25px rgba(255, 165, 0, 0.7), 0 0 10px rgba(255, 215, 0, 0.5); } }
+            .glow-card { animation: subtle-container-glow 6s infinite ease-in-out alternate; }
+        `,
+        activeEffects: ['ghost', 'spiderweb'] 
+    },
+
+    // 3. NAVIDAD (Diciembre)
+    seasonal_christmas: {
+        
+        name: 'christmas',
+        label: '🎄 Navidad',
+        hidden: true,
+        
+        bodyBg: 'bg-red-950',
+        cardBg: 'bg-green-900/90 backdrop-blur-sm border border-yellow-400/30',
+        primaryText: 'text-white',
+        secondaryText: 'text-gray-200',
+        accentText: 'text-yellow-300 font-bold',
+        
+        inputBorder: 'border-red-400 focus:border-yellow-300 bg-red-900/50',
+        shopSelectBorder: 'border-yellow-400',
+        
+        buttonAction: 'bg-yellow-500 hover:bg-yellow-600 text-green-900 font-bold shadow-lg',
+        buttonAdd: 'bg-red-600 hover:bg-red-700 text-white',
+        modalBg: 'bg-green-900 border-yellow-400',
+        
+        customCss: `background-image: linear-gradient(to bottom, #1e3a8a, #111827);`, 
+        activeEffects: ['snow', 'lights'] 
+    },
+
+    // 4. CUMPLEAÑOS BIANCA (18 Dic - Unicornios)
+    seasonal_bianca_bday:{
+        
+        name: 'biancaBday',
+        label: '🦄 Cumple Bianca',
+        hidden: true,
+        
+        bodyBg: 'bg-black',
+        cardBg: 'bg-gray-900/90 backdrop-blur-sm shadow-2xl shadow-purple-500/30 border border-purple-500/50',
+        primaryText: 'text-purple-400',
+        secondaryText: 'text-pink-300',
+        accentText: 'text-pink-400 font-bold animate-pulse',
+        
+        inputBorder: 'border-gray-700 focus:border-purple-500 bg-gray-800',
+        shopSelectBorder: 'border-pink-400',
+        
+        buttonAction: 'bg-purple-600 hover:bg-purple-700 text-white shadow-[0_0_15px_rgba(192,132,252,0.5)]',
+        buttonAdd: 'bg-red-600 hover:bg-red-700 text-white',
+        modalBg: 'bg-gray-900 border-pink-500',
+        
+        customCss: `
+            background-image: radial-gradient(circle at top right, #4c1d95, #000);
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><text y="20" font-size="20">🦄</text></svg>') 12 12, auto !important;
+            @keyframes party-glow { 0%, 100% { box-shadow: 0 0 20px rgba(217, 70, 239, 0.5); } 50% { box-shadow: 0 0 30px rgba(244, 63, 94, 0.7); } }
+            .glow-card { animation: party-glow 5s infinite ease-in-out alternate; }
+        `,
+        activeEffects: ['mickey_confetti'] // Reutilizamos el confeti o creamos uno de magia
+    },
+
+    // 5. CUMPLEAÑOS GENÉRICO (Resto del equipo)
+    seasonal_party: {
+
+        name: 'party',
+        label: '🎉 Cumpleaños',
+        hidden: true,
+        
+        bodyBg: 'bg-slate-900',
+        cardBg: 'bg-gray-900/80 backdrop-blur-sm border border-fuchsia-500/30',
+        primaryText: 'text-fuchsia-400',
+        secondaryText: 'text-gray-200',
+        accentText: 'text-cyan-400 font-bold',
+        
+        inputBorder: 'border-gray-600 focus:border-fuchsia-500 bg-gray-800',
+        shopSelectBorder: 'border-cyan-500',
+        
+        buttonAction: 'bg-gradient-to-r from-fuchsia-600 to-cyan-600 text-white',
+        buttonAdd: 'bg-fuchsia-600 hover:bg-fuchsia-700 text-white',
+        modalBg: 'bg-gray-900 border-fuchsia-500',
+        
+        activeEffects: ['mickey_confetti'] // Usamos confeti genérico
+    },
+    
    // --- DEFAULT (REMASTERIZADO: PRO DARK MODE) ---
     default: {
         name: 'default',

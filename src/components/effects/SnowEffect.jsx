@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 
 const SnowEffect = () => {
     // Creamos 50 copos de nieve con posiciones y retrasos aleatorios
