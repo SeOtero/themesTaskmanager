@@ -36,7 +36,7 @@ export const useThemeManager = (birthdays, pastReports, setManualTheme, manualTh
         // Si NO hay tema manual, miramos el calendario.
         
         // San Valentín (Feb 13-15)
-        if (month === 2 && day >= 13 && day <= 15) return THEMES.seasonal_valentines || THEMES.default;
+        if (month === 2 && day >= 13 && day <= 14) return THEMES.seasonal_valentines || THEMES.default;
         
         // Halloween (Oct 31)
         if (month === 10 && day === 31) return THEMES.seasonal_halloween || THEMES.default;
