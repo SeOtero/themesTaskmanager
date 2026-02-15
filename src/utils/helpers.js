@@ -58,6 +58,8 @@ export const parseHoursFromReport = (content) => {
     return 0;
 };
 
+
+
 // --- FUNCIÓN AGREGADA PARA EL PLANNER ---
 export const getNextWeekID = () => {
     const today = new Date();
@@ -73,10 +75,9 @@ export const getNextWeekID = () => {
 
 export const getCurrentWeekID = () => {
     const now = new Date();
-    const startOfYear = new Date(now.getFullYear(), 0, 1);
-    const pastDays = (now - startOfYear) / 86400000;
-    const weekNum = Math.ceil((pastDays + startOfYear.getDay() + 1) / 7);
-    return `${now.getFullYear()}-W${weekNum}`;
+    const onejan = new Date(now.getFullYear(), 0, 1);
+    const week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+    return `${now.getFullYear()}-W${week}`;
 };
 
 export const generateEODRContent = (tasks, dateStr, themeName) => {
