@@ -35,7 +35,7 @@ import ThemeSelectorWidget from './components/ui/ThemeSelector';
 import FloatingSalaryButton from './components/ui/FloatingSalaryButton';
 import NewsTicker from './components/ui/NewsTicker';
 import FloatingActions from './components/ui/FloatingActions';
-import QuickNotesWidget from './components/tools/QuickNotesWidget';
+import QuickNotesWidget from './components/tools/QuickNotesWidget'; // ✅ Ruta corregida
 // --- MODALES ---
 import ReportConfigModal from './components/modals/ReportConfigModal';
 import SalaryCalculatorModal from './components/modals/SalaryCalculatorModal';
@@ -139,13 +139,13 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
         updateTaskDetails, 
         resetTaskTimer, 
         stopAllTimers, 
-        statusMessage,        // ✅ NECESARIO para que no de error
+        statusMessage,
         resumeStoppedTimers, 
         clearStatusMessage, 
         syncTasksTime, 
         errorMessage, 
         setErrorMessage,
-        distributeTasksTime,   // ✅ NECESARIO para el modal 
+        distributeTasksTime,
         sortTasksByShop,
     } = taskData;
 
@@ -167,7 +167,18 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
                 }
             }
         });
-        return () => { newsUnsub(); quizUnsub(); progressUnsub(); };
+        
+        // --- 🔥 CARGAR REPORTES PASADOS (CRÍTICO) 🔥 ---
+        // Esto asegura que al abrir la app veas los reportes que ya existen en Firebase
+        const reportsUnsub = onSnapshot(query(collection(db, "daily_reports"), where("uid", "==", user.uid)), (snap) => {
+            const loadedReports = snap.docs.map(doc => ({
+                id: doc.data().date, // Usamos la fecha real del doc como ID
+                content: doc.data().report
+            }));
+            setPastReports(loadedReports);
+        });
+
+        return () => { newsUnsub(); quizUnsub(); progressUnsub(); reportsUnsub(); };
     }, [user, themeClasses.name, isIdeasModalOpen]);
 
     const graduationStatus = useMemo(() => {
@@ -214,13 +225,28 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
         } catch (e) { console.error(e); }
     };
 
-    // ✅ CORRECCIÓN 1: Evitamos el crash en reportes si themeClasses es null
+    // ✅ CORRECCIÓN CLAVE: Usamos la fecha seleccionada 'selectedReportDate'
     const confirmGenerateReport = () => {
         const skinName = themeClasses?.name || 'default';
+        
+        // 1. Pasamos la fecha seleccionada al hook de guardado
         handleGenerate(selectedReportDate, skinName, (textGenerated, dataSaved) => {
+            
+            // 2. Actualizamos la vista previa
             setReportOutput(textGenerated);
-            const newReport = { id: selectedReportDate, content: textGenerated };
-            setPastReports(prev => [newReport, ...prev.filter(r => r.id !== selectedReportDate)]);
+            
+            // 3. Actualizamos la lista local usando la FECHA CORRECTA
+            const newReport = { 
+                id: selectedReportDate, // <--- ESTO ARREGLA EL CALENDARIO
+                content: textGenerated 
+            };
+            
+            setPastReports(prev => [
+                newReport, 
+                ...prev.filter(r => r.id !== selectedReportDate) // Evitamos duplicados
+            ]);
+            
+            // 4. Cerramos el modal
             setIsReportModalOpen(false);
         });
     };
@@ -332,11 +358,9 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
             <IdeasModal isOpen={isIdeasModalOpen} onClose={() => setIsIdeasModalOpen(false)} user={user} userProfile={userProfile} initialType={ideaType} />
             <AvailabilityModal isOpen={isAvailabilityModalOpen} onClose={() => setIsAvailabilityModalOpen(false)} user={user} userProfile={userProfile} addCoins={addCoins} logEvent={logEvent} />
                 
-            {/* 🔥 WIDGET DE NOTAS PARA AGENTES 🔥 */}
+            {/* 🔥 WIDGET DE NOTAS 🔥 */}
             <QuickNotesWidget user={user} />
 
-            
-            {/* ✅ CORRECCIÓN 2: Pasamos isOpen={true} para que no salga pantalla negra */}
             {activeQuiz && (
                 <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
                     <QuizModal isOpen={true} quiz={activeQuiz} onClose={() => setActiveQuiz(null)} onComplete={handleQuizComplete} user={user} />
@@ -351,31 +375,37 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
            <ReportConfigModal 
                 isOpen={isReportModalOpen} 
                 onClose={() => setIsReportModalOpen(false)} 
-                
-                // ✅ CORRECCIÓN: Usamos 'confirmGenerateReport', no 'handleGenerateReport'
                 onGenerate={confirmGenerateReport} 
-                
                 tasks={tasks} 
                 syncTasksTime={syncTasksTime} 
-                distributeTasksTime={distributeTasksTime} // ✅ Pasamos la función
-                
+                distributeTasksTime={distributeTasksTime} 
                 themeClasses={themeClasses} 
                 selectedReportDate={selectedReportDate} 
                 setSelectedReportDate={setSelectedReportDate} 
                 pastReports={pastReports} 
             />
             <SalaryCalculatorModal isOpen={isSalaryModalOpen} onClose={() => setIsSalaryModalOpen(false)} pastReports={pastReports} hourlyRate={hourlyRate} setHourlyRate={setHourlyRate} themeClasses={themeClasses} />
-            <DeleteAllConfirmationModal isOpen={isDeleteAllModalOpen} onClose={() => setIsDeleteAllModalOpen(false)} onConfirm={deleteAllTasks} themeClasses={themeClasses} />
+            
+            {/* 🔥 CORRECCIÓN: Cierre forzoso de modales al borrar todo 🔥 */}
+            <DeleteAllConfirmationModal 
+                isOpen={isDeleteAllModalOpen} 
+                onClose={() => setIsDeleteAllModalOpen(false)} 
+                onConfirm={() => {
+                    deleteAllTasks();
+                    setIsDeleteAllModalOpen(false);
+                    setIsReportModalOpen(false); // <--- Seguridad extra
+                }} 
+                themeClasses={themeClasses} 
+            />
+                
             <MarketplaceModal isOpen={isMarketModalOpen} onClose={handleCloseShop} userCoins={lofiCoins} ownedItems={inventory} currentTheme={themeClasses.name} activePet={activePet} activeBorder={activeBorder} activeEffect={activeEffect} onBuy={handleBuyItem} onEquip={applyItemChange} onPreview={handlePreviewItem} />
 
             {/* --- CONTENEDOR PRINCIPAL --- */}
             <div className="app-container relative z-10 flex flex-col items-center justify-center py-10 mt-8">
                 <div className="relative w-11/12 max-w-xl mt-8">
-                   {/* Tarjeta con Marco */}
                    <div className={`w-full rounded-2xl shadow-2xl p-4 sm:p-8 pt-8 sm:pt-12 transition-all duration-500 ${themeClasses.cardBg} min-h-[85vh] relative ${cardGlowClass} ${getBorderClass()} app-card`}>
                         {themeClasses.activeEffects && themeClasses.activeEffects.includes('spiderweb') && <SpiderWeb />}
                         
-                        {/* ✅ CORRECCIÓN 3: 'relative z-20' para que el contenido esté ENCIMA de cualquier borde animado */}
                         <div className="relative z-20 space-y-6 h-full flex flex-col">
                             <Title themeClasses={themeClasses} celebrationMessage={message} />
                             
@@ -398,38 +428,23 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
 
                             <ThemeSelectorWidget isUnlocked={isUnlocked} weeklyHours={weeklyHoursWorked} targetHours={weeklyGoal} setTargetHours={setWeeklyGoal} onClaimBonus={handleClaimWeeklyBonus} bonusClaimed={isBonusClaimedThisWeek} />
                             
-                            {/* Pestañas (Tabs) */}
                             <div className="flex justify-center gap-4 border-b border-white/10 pb-2 mb-2">
                                 <button onClick={() => setActiveTab('tasks')} className={`px-4 py-2 rounded-lg font-bold text-sm ${activeTab === 'tasks' ? 'bg-white/20 text-white' : 'text-slate-400'}`}>📝 TAREAS</button>
                                 <button onClick={() => setActiveTab('history')} className={`px-4 py-2 rounded-lg font-bold text-sm ${activeTab === 'history' ? 'bg-white/20 text-white' : 'text-slate-400'}`}>📅 HISTORIAL</button>
                             </div>
 
-                            {/* Contenido: TAREAS */}
                             {activeTab === 'tasks' && (
                                 <div className="flex-1 flex flex-col gap-4 animate-fadeIn">
                                     <TaskInputForm addTask={addTask} addMultipleTasks={addMultipleTasks} errorMessage={errorMessage} setErrorMessage={setErrorMessage} themeClasses={themeClasses} />
-                                    {/* --- BOTONES DE CONTROL (NUEVOS) --- */}
-        {tasks.length > 0 && (
-            <div className="flex items-center justify-between gap-3 px-1 mb-1 animate-fadeIn">
-               
-                
-                {/* Botón Ordenar */}
-                <button 
-                    onClick={sortTasksByShop}
-                    className="px-4 py-2 bg-slate-700/50 hover:bg-slate-600 text-slate-300 text-xs font-bold uppercase tracking-wider rounded-full border border-slate-600 hover:border-slate-400 transition-all shadow-sm active:scale-95 flex items-center gap-2"
-                >
-                    <span>🏷️</span> Ordenar por Tienda
-                </button>
+                                    
+                                    {/* Botones de control de lista */}
+                                    {tasks.length > 0 && (
+                                        <div className="flex items-center justify-between gap-3 px-1 mb-1 animate-fadeIn">
+                                            <button onClick={sortTasksByShop} className="px-4 py-2 bg-slate-700/50 hover:bg-slate-600 text-slate-300 text-xs font-bold uppercase tracking-wider rounded-full border border-slate-600 hover:border-slate-400 transition-all shadow-sm active:scale-95 flex items-center gap-2"><span>🏷️</span> Ordenar por Tienda</button>
+                                            <button onClick={() => setIsDeleteAllModalOpen(true)} className="px-4 py-2 bg-red-900/30 hover:bg-red-800 text-red-400 hover:text-red-100 text-xs font-bold uppercase tracking-wider rounded-full border border-red-900 hover:border-red-500 transition-all shadow-sm active:scale-95 flex items-center gap-2"><span>🗑️</span> Limpiar Todo</button>
+                                        </div>
+                                    )}
 
-                {/* Botón Limpiar Todo */}
-                <button 
-                    onClick={() => setIsDeleteAllModalOpen(true)}
-                    className="px-4 py-2 bg-red-900/30 hover:bg-red-800 text-red-400 hover:text-red-100 text-xs font-bold uppercase tracking-wider rounded-full border border-red-900 hover:border-red-500 transition-all shadow-sm active:scale-95 flex items-center gap-2"
-                >
-                    <span>🗑️</span> Limpiar Todo
-                </button>
-            </div>
-        )}
                                     <div className="flex-1 overflow-y-auto task-scroll pr-2 space-y-3 min-h-[50vh] max-h-[65vh] border border-white/5 rounded-xl p-2 bg-black/10">
                                         {tasks.length > 0 ? tasks.map((task) => ( <TaskListItem key={task.id} task={task} toggleTimer={toggleTimer} deleteTask={deleteTask} updateTaskDetails={updateTaskDetails} themeClasses={themeClasses} resetTaskTimer={resetTaskTimer} celebrationThemeName={themeClasses.name} /> )) : <p className={`text-center italic mt-10 ${themeClasses.secondaryText}`}>No hay tareas activas.</p>}
                                     </div>
@@ -440,7 +455,6 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
                                 </div>
                             )}
                             
-                            {/* Contenido: HISTORIAL */}
                             {activeTab === 'history' && (
                                 <div className="flex-1 flex flex-col gap-6 animate-fadeIn">
                                     <div className="space-y-4">

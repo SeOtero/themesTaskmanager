@@ -8,7 +8,7 @@ const ReportConfigModal = ({ isOpen, onClose, onGenerate, tasks, distributeTasks
     const [showOverwriteWarning, setShowOverwriteWarning] = useState(false);
     const [webWorkTime, setWebWorkTime] = useState(''); 
     const [appTotalString, setAppTotalString] = useState("00:00:00");
-    const [selectedTaskIds, setSelectedTaskIds] = useState([]); // IDs de tareas seleccionadas
+    const [selectedTaskIds, setSelectedTaskIds] = useState([]); 
 
     // --- CÁLCULOS EN VIVO ---
     const currentTotalMs = useMemo(() => {
@@ -18,7 +18,6 @@ const ReportConfigModal = ({ isOpen, onClose, onGenerate, tasks, distributeTasks
         }, 0);
     }, [tasks, isOpen]);
 
-    // Efecto visual del string total
     useEffect(() => {
         const h = Math.floor(currentTotalMs / 3600000).toString().padStart(2, '0');
         const m = Math.floor((currentTotalMs % 3600000) / 60000).toString().padStart(2, '0');
@@ -42,7 +41,6 @@ const ReportConfigModal = ({ isOpen, onClose, onGenerate, tasks, distributeTasks
         return ((h * 3600) + (m * 60) + s) * 1000;
     };
 
-    // Formatear ms a HH:MM:SS (Maneja negativos)
     const formatMs = (ms) => {
         const absMs = Math.abs(ms);
         const h = Math.floor(absMs / 3600000).toString().padStart(2, '0');
@@ -51,16 +49,21 @@ const ReportConfigModal = ({ isOpen, onClose, onGenerate, tasks, distributeTasks
         return `${ms < 0 ? '-' : ''}${h}:${m}:${s}`;
     };
 
-    // --- LOGICA DE DIFERENCIA ---
     const targetMs = parseTimeStringToMs(webWorkTime);
     const differenceMs = targetMs - currentTotalMs; 
-    // differenceMs > 0 : Falta tiempo en App (Repartir/Sumar)
-    // differenceMs < 0 : Sobra tiempo en App (Recortar/Restar)
 
     // --- HANDLERS ---
+    
+    // ✅ CORRECCIÓN AQUÍ: Solo llamamos a onGenerate(), no intentamos generar el texto aquí.
     const handleConfirmClick = () => {
         const reportExists = Array.isArray(pastReports) && pastReports.some(r => r.id === selectedReportDate);
-        if (reportExists) { setShowOverwriteWarning(true); } else { onGenerate(); }
+        
+        if (reportExists) { 
+            setShowOverwriteWarning(true); 
+        } else { 
+            // Simplemente avisamos al padre (App.jsx) que proceda
+            onGenerate(); 
+        }
     };
 
     const handleTimeChange = (e) => {
@@ -82,19 +85,10 @@ const ReportConfigModal = ({ isOpen, onClose, onGenerate, tasks, distributeTasks
         else setSelectedTaskIds(tasks.map(t => t.id));
     };
 
-    // ✅ LÓGICA UNIFICADA (SUMAR Y RESTAR)
     const handleSmartSync = () => {
         if (differenceMs === 0) return;
-
-        if (selectedTaskIds.length === 0) {
-            alert("Por favor selecciona al menos una tarea.");
-            return;
-        }
-
-        // distributeTasksTime maneja la división. 
-        // Si differenceMs es negativo, automáticamente restará el tiempo.
+        if (selectedTaskIds.length === 0) { alert("Por favor selecciona al menos una tarea."); return; }
         distributeTasksTime(selectedTaskIds, differenceMs);
-
         const accion = differenceMs > 0 ? "repartido" : "descontado";
         alert(`Se han ${accion} ${formatMs(Math.abs(differenceMs))} entre las ${selectedTaskIds.length} tareas seleccionadas.`);
     };
@@ -109,7 +103,8 @@ const ReportConfigModal = ({ isOpen, onClose, onGenerate, tasks, distributeTasks
                         <h3 className="text-xl font-bold text-red-400 mb-2">¡Cuidado!</h3>
                         <p className="text-gray-300 mb-6">Ya existe un reporte para esta fecha.</p>
                         <div className="flex flex-col gap-3 w-full">
-                            <button onClick={onGenerate} className="w-full py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition shadow-lg">Sí, Sobreescribir</button>
+                            {/* ✅ CORRECCIÓN: Aquí también solo llamamos a onGenerate */}
+                            <button onClick={() => onGenerate()} className="w-full py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition shadow-lg">Sí, Sobreescribir</button>
                             <button onClick={() => setShowOverwriteWarning(false)} className="w-full py-3 rounded-xl font-bold text-gray-300 bg-gray-700 hover:bg-gray-600 transition">Cancelar</button>
                         </div>
                     </div>
@@ -117,7 +112,6 @@ const ReportConfigModal = ({ isOpen, onClose, onGenerate, tasks, distributeTasks
                     <>
                         <h2 className={`text-xl font-bold mb-4 text-center ${themeClasses.primaryText}`}>Preparar Reporte</h2>
                         
-                        {/* Selector de Fecha */}
                         <div className="mb-4 flex justify-center">
                             <div className="relative group cursor-pointer border border-cyan-500/30 bg-black/40 px-4 py-2 rounded-lg flex items-center gap-2">
                                 <span className="text-white font-mono">{getFormattedDate(selectedReportDate)}</span>
@@ -126,7 +120,6 @@ const ReportConfigModal = ({ isOpen, onClose, onGenerate, tasks, distributeTasks
                             </div>
                         </div>
 
-                        {/* --- SINCRONIZADOR INTELIGENTE --- */}
                         <div className="bg-black/30 p-4 rounded-xl border border-white/10 mb-4">
                             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 text-center">Sincronización</h3>
                             
@@ -137,70 +130,36 @@ const ReportConfigModal = ({ isOpen, onClose, onGenerate, tasks, distributeTasks
                                 </div>
                                 <div className="text-center">
                                     <label className="text-[10px] text-cyan-400 block mb-1">WEBWORK (HH:MM:SS)</label>
-                                    <input 
-                                        type="text" 
-                                        value={webWorkTime} 
-                                        onChange={handleTimeChange}
-                                        placeholder="00:00:00" 
-                                        maxLength={8}
-                                        className={`w-full bg-black/50 border ${themeClasses.inputBorder} text-cyan-300 text-lg font-mono p-1 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                                    />
+                                    <input type="text" value={webWorkTime} onChange={handleTimeChange} placeholder="00:00:00" maxLength={8} className={`w-full bg-black/50 border ${themeClasses.inputBorder} text-cyan-300 text-lg font-mono p-1 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-cyan-500`} />
                                 </div>
                             </div>
 
-                            {/* INDICADOR DE DIFERENCIA */}
                             {webWorkTime.length >= 4 && (
                                 <div className={`text-center mb-4 text-sm font-bold py-1 rounded ${differenceMs > 0 ? 'bg-green-900/30 text-green-400' : (differenceMs < 0 ? 'bg-red-900/30 text-red-400' : 'text-gray-500')}`}>
                                     {differenceMs > 0 ? `Faltan cargar: ${formatMs(differenceMs)}` : (differenceMs < 0 ? `Te pasaste por: ${formatMs(differenceMs)}` : '¡Sincronizado!')}
                                 </div>
                             )}
 
-                            {/* --- LISTA DE SELECCIÓN (APARECE SIEMPRE QUE HAYA DIFERENCIA) --- */}
                             {differenceMs !== 0 && (
                                 <div className="animate-fadeIn">
                                     <div className="flex justify-between items-center mb-2">
-                                        <p className="text-xs text-gray-400">
-                                            {differenceMs > 0 ? 'Elige dónde SUMAR tiempo:' : 'Elige dónde RESTAR tiempo:'}
-                                        </p>
-                                        <button onClick={handleSelectAll} className="text-[10px] text-cyan-400 hover:text-cyan-300 underline">
-                                            {selectedTaskIds.length === tasks.length ? 'Deseleccionar' : 'Todos'}
-                                        </button>
+                                        <p className="text-xs text-gray-400">{differenceMs > 0 ? 'Elige dónde SUMAR tiempo:' : 'Elige dónde RESTAR tiempo:'}</p>
+                                        <button onClick={handleSelectAll} className="text-[10px] text-cyan-400 hover:text-cyan-300 underline">{selectedTaskIds.length === tasks.length ? 'Deseleccionar' : 'Todos'}</button>
                                     </div>
                                     <div className="max-h-40 overflow-y-auto custom-scrollbar border border-white/5 rounded-lg bg-black/20 p-2 space-y-1">
                                         {tasks.map(task => (
-                                            <div 
-                                                key={task.id} 
-                                                onClick={() => toggleTaskSelection(task.id)}
-                                                className={`flex items-center gap-3 p-2 rounded cursor-pointer transition-colors ${selectedTaskIds.includes(task.id) ? (differenceMs > 0 ? 'bg-emerald-900/30 border border-emerald-500/30' : 'bg-red-900/30 border border-red-500/30') : 'hover:bg-white/5 border border-transparent'}`}
-                                            >
-                                                <div className={`w-4 h-4 rounded border flex items-center justify-center ${selectedTaskIds.includes(task.id) ? (differenceMs > 0 ? 'bg-emerald-500 border-emerald-500' : 'bg-red-500 border-red-500') : 'border-gray-600'}`}>
-                                                    {selectedTaskIds.includes(task.id) && <span className="text-black text-[10px] font-bold">✓</span>}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-sm text-gray-200 truncate">{task.text || task.name}</p>
-                                                </div>
+                                            <div key={task.id} onClick={() => toggleTaskSelection(task.id)} className={`flex items-center gap-3 p-2 rounded cursor-pointer transition-colors ${selectedTaskIds.includes(task.id) ? (differenceMs > 0 ? 'bg-emerald-900/30 border border-emerald-500/30' : 'bg-red-900/30 border border-red-500/30') : 'hover:bg-white/5 border border-transparent'}`}>
+                                                <div className={`w-4 h-4 rounded border flex items-center justify-center ${selectedTaskIds.includes(task.id) ? (differenceMs > 0 ? 'bg-emerald-500 border-emerald-500' : 'bg-red-500 border-red-500') : 'border-gray-600'}`}>{selectedTaskIds.includes(task.id) && <span className="text-black text-[10px] font-bold">✓</span>}</div>
+                                                <div className="flex-1 min-w-0"><p className="text-sm text-gray-200 truncate">{task.text || task.name}</p></div>
                                                 <span className="text-xs font-mono text-gray-500">{formatMs(task.elapsedTime)}</span>
                                             </div>
                                         ))}
                                     </div>
-                                    <p className="text-[10px] text-center mt-2 text-cyan-200/70">
-                                        {differenceMs > 0 ? 'Se sumarán' : 'Se restarán'} <span className="font-bold">{selectedTaskIds.length > 0 ? formatMs(Math.abs(differenceMs / selectedTaskIds.length)) : '00:00:00'}</span> {differenceMs > 0 ? 'a' : 'de'} cada tarea seleccionada.
-                                    </p>
+                                    <p className="text-[10px] text-center mt-2 text-cyan-200/70">{differenceMs > 0 ? 'Se sumarán' : 'Se restarán'} <span className="font-bold">{selectedTaskIds.length > 0 ? formatMs(Math.abs(differenceMs / selectedTaskIds.length)) : '00:00:00'}</span> {differenceMs > 0 ? 'a' : 'de'} cada tarea seleccionada.</p>
                                 </div>
                             )}
 
-                            {/* BOTÓN DE ACCIÓN */}
-                            <button 
-                                onClick={handleSmartSync}
-                                disabled={webWorkTime.length < 4 || (differenceMs !== 0 && selectedTaskIds.length === 0)}
-                                className={`w-full mt-4 py-3 rounded-xl font-bold uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2
-                                    ${differenceMs === 0 ? 'bg-gray-700 text-gray-400 cursor-not-allowed' : 
-                                      differenceMs > 0 ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/50' : 
-                                      'bg-red-600 hover:bg-red-500 text-white shadow-red-900/50'
-                                    }`}
-                            >
-                                {differenceMs > 0 ? '⚡ Repartir (Sumar)' : (differenceMs < 0 ? '✂️ Recortar (Restar)' : 'Perfecto')}
-                            </button>
+                            <button onClick={handleSmartSync} disabled={webWorkTime.length < 4 || (differenceMs !== 0 && selectedTaskIds.length === 0)} className={`w-full mt-4 py-3 rounded-xl font-bold uppercase tracking-wider transition-all shadow-lg flex items-center justify-center gap-2 ${differenceMs === 0 ? 'bg-gray-700 text-gray-400 cursor-not-allowed' : differenceMs > 0 ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/50' : 'bg-red-600 hover:bg-red-500 text-white shadow-red-900/50'}`}>{differenceMs > 0 ? '⚡ Repartir (Sumar)' : (differenceMs < 0 ? '✂️ Recortar (Restar)' : 'Perfecto')}</button>
                         </div>
                         
                         <div className="flex gap-3">
