@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { saveDailyReport } from '../services/reportService';
 import { generateCustomReport } from '../utils/reportGenerator';
-import { doc, updateDoc } from 'firebase/firestore'; // Importamos updateDoc
-import { db } from '../firebase'; // Asegúrate que la ruta a firebase sea correcta
+import { doc, updateDoc, getDoc } from 'firebase/firestore'; // 🔥 Agregamos getDoc
+import { db } from '../firebase'; 
 
 export const useReportManager = (user, tasks, stopAllTimers, addCoins, userProfile) => {
     const [isProcessing, setIsProcessing] = useState(false);
@@ -13,34 +13,42 @@ export const useReportManager = (user, tasks, stopAllTimers, addCoins, userProfi
             // 1. Detener timers
             stopAllTimers();
 
-            // 2. Generar el TEXTO antes de guardar (para tenerlo listo)
-            const reportText = generateCustomReport(tasks, selectedDate, themeName);
+            // 2. 🔥 CHECK DE SEGURIDAD: ¿Ya existe un reporte para esta fecha?
+            const docId = `${user.uid}_${selectedDate}`; 
+            const reportRef = doc(db, "daily_reports", docId);
+            const reportSnap = await getDoc(reportRef);
+            const reportExists = reportSnap.exists(); // true si ya se cobró hoy
 
             // 3. Guardar en BD (Servicio existente)
-            const { totalReward, reportData, reportId } = await saveDailyReport(user, tasks, selectedDate, userProfile);
+            const { totalReward, reportData } = await saveDailyReport(user, tasks, selectedDate, userProfile);
 
-            // 🔥 FIX CRÍTICO: Forzamos la actualización del campo 'report' y 'date' en Firebase
-            // Esto asegura que el TEXTO se guarde sí o sí, aunque el servicio lo haya olvidado.
+            // 4. Generar el TEXTO visual
+            const reportText = generateCustomReport(tasks, selectedDate, themeName);
+
+            // 5. FIX DE TEXTO (El parche que hicimos antes para asegurar que se guarde el texto)
             if (user && selectedDate) {
-                // Recreamos el ID del documento igual que lo hace el servicio (generalmente uid_fecha)
-                const docId = `${user.uid}_${selectedDate}`; 
-                const reportRef = doc(db, "daily_reports", docId);
-                
                 await updateDoc(reportRef, {
-                    report: reportText, // Guardamos el texto visible
-                    date: selectedDate,  // Aseguramos la fecha correcta
-                    content: reportText // Backup por si acaso
-                }).catch(e => console.warn("No se pudo actualizar el texto del reporte:", e));
+                    report: reportText, 
+                    date: selectedDate,
+                    content: reportText 
+                }).catch(e => {
+                    // Si el documento no existía (era nuevo), updateDoc puede fallar si saveDailyReport es muy lento,
+                    // pero saveDailyReport ya debería haberlo creado. Ignoramos este error seguro.
+                    console.warn("Actualización secundaria:", e);
+                });
             }
 
-            // 4. Pagar al usuario
-            if (totalReward > 0) {
+            // 6. 💰 LÓGICA DE PAGO CONDICIONAL 💰
+            if (!reportExists && totalReward > 0) {
+                // SOLO si es reporte NUEVO
                 addCoins(totalReward);
+                alert(`✅ Reporte NUEVO guardado.\n💰 ¡Ganaste: ${totalReward} Lofi Coins!`);
+            } else {
+                // Si ya existía, solo avisamos que se actualizó
+                alert(`🔄 Reporte ACTUALIZADO correctamente.\n(No se otorgan monedas por editar reportes existentes)`);
             }
-
-            // 5. Notificar éxito
-            alert(`✅ Reporte guardado correctamente.\nGanaste: ${totalReward} Lofi Coins.`);
             
+            // 7. Callback para la UI
             if (onSuccess) onSuccess(reportText, reportData);
 
         } catch (error) {
