@@ -11,6 +11,7 @@ import TLAcademyTab from './TLAcademyTab';
 import TLIdeasTab from './TLIdeasTab';
 import TLUsersTab from './TLUsersTab';
 import TLNotificationsModal from './TLNotificationsModal';
+import QuickNotesWidget from '../tools/QuickNotesWidget';
 
 // --- LISTA DE TAREAS ---
 const KNOWN_TASKS = ["Columna CONFIRMADO", "Columna UPSELL", "Columna DATOS ENTREGA", "Columna RESPONDER", "Columna REMINDER", "Chat en vivo (filtro Pendiente)", "Columna LATE VERIFICATION", "Chat en vivo (filtro Abiertos)", "Ordenes confirmadas sheet (CHECK info)", "CHAT Pending Orders", "CALL Pending Orders", "Facebook/Instagram Comments & Chats"];
@@ -220,7 +221,8 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
             {isSendIdeaModalOpen && (<div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"><div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl p-6"><h3 className="text-lg font-bold text-white mb-4">Nueva Idea</h3><textarea className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white text-sm h-40" value={newIdeaText} onChange={(e) => setNewIdeaText(e.target.value)} /><div className="flex gap-2 mt-4"><button onClick={handleSendIdea} className="flex-1 bg-indigo-600 py-2 rounded font-bold">Enviar</button><button onClick={()=>setIsSendIdeaModalOpen(false)} className="px-4 bg-slate-700 rounded">X</button></div></div></div>)}
             {showSummaryModal && (<div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-4"><div className="bg-slate-900 w-full max-w-2xl h-[80vh] flex flex-col"><textarea readOnly value={summaryText} className="flex-1 bg-slate-950 p-6 text-green-400 font-mono" /><button onClick={()=>setShowSummaryModal(false)} className="py-3 bg-slate-800 text-white font-bold">Cerrar</button></div></div>)}
             {isGoalsModalOpen && (<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"><div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg p-6 max-h-[80vh] overflow-y-auto"><h3 className="text-lg font-bold text-white mb-4">Metas</h3><div className="space-y-2">{detectedTasks.map(t=>(<div key={t} className="flex justify-between text-sm text-slate-300"><span>{t}</span><input type="number" value={taskGoals[t]||''} onChange={e=>setTaskGoals({...taskGoals, [t]:e.target.value})} className="bg-black/40 w-16 text-center text-green-400"/></div>))}</div><button onClick={()=>setIsGoalsModalOpen(false)} className="mt-4 w-full bg-indigo-600 py-2 rounded font-bold">Listo</button></div></div>)}
-
+                    {/* 🔥 WIDGET DE NOTAS RÁPIDAS 🔥 */}
+            <QuickNotesWidget user={auth.currentUser} />
             {/* 🔥 MODAL DE NOTIFICACIONES UNIFICADO 🔥 */}
             <TLNotificationsModal 
                 isOpen={showNotificationsModal}

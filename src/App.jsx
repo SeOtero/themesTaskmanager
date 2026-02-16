@@ -35,7 +35,7 @@ import ThemeSelectorWidget from './components/ui/ThemeSelector';
 import FloatingSalaryButton from './components/ui/FloatingSalaryButton';
 import NewsTicker from './components/ui/NewsTicker';
 import FloatingActions from './components/ui/FloatingActions';
-
+import QuickNotesWidget from './components/tools/QuickNotesWidget';
 // --- MODALES ---
 import ReportConfigModal from './components/modals/ReportConfigModal';
 import SalaryCalculatorModal from './components/modals/SalaryCalculatorModal';
@@ -331,6 +331,10 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
 
             <IdeasModal isOpen={isIdeasModalOpen} onClose={() => setIsIdeasModalOpen(false)} user={user} userProfile={userProfile} initialType={ideaType} />
             <AvailabilityModal isOpen={isAvailabilityModalOpen} onClose={() => setIsAvailabilityModalOpen(false)} user={user} userProfile={userProfile} addCoins={addCoins} logEvent={logEvent} />
+                
+            {/* 🔥 WIDGET DE NOTAS PARA AGENTES 🔥 */}
+            <QuickNotesWidget user={user} />
+
             
             {/* ✅ CORRECCIÓN 2: Pasamos isOpen={true} para que no salga pantalla negra */}
             {activeQuiz && (
@@ -407,6 +411,7 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
                                     {/* --- BOTONES DE CONTROL (NUEVOS) --- */}
         {tasks.length > 0 && (
             <div className="flex items-center justify-between gap-3 px-1 mb-1 animate-fadeIn">
+               
                 
                 {/* Botón Ordenar */}
                 <button 
