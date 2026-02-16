@@ -41,7 +41,10 @@ export const CalendarWidget = ({ reports = [], selectedDate, onSelectDate, theme
                 <span className={`font-bold text-lg ${themeClasses.primaryText}`}>{monthNames[viewDate.getMonth()]} {viewDate.getFullYear()}</span>
                 <button onClick={handleNextMonth} className={`p-1 rounded-full hover:bg-gray-600/50 ${themeClasses.primaryText}`}>&gt;</button>
             </div>
-            <div className="grid grid-cols-7 gap-1 text-center mb-2">{weekDays.map(d => <div key={d} className={`text-xs font-bold ${themeClasses.secondaryText} opacity-70`}>{d}</div>)}</div>
+            
+<div className="grid grid-cols-7 gap-1 text-center mb-2">
+    {weekDays.map((d, i) => <div key={i} className={`text-xs font-bold opacity-70 ${themeClasses.secondaryText}`}>{d}</div>)}
+</div>
             <div className="grid grid-cols-7 gap-1 justify-items-center">{generateCalendarDays()}</div>
         </div>
     );

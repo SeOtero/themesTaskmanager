@@ -157,8 +157,14 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
 
     useEffect(() => {
         if (!user) return;
+
+        // 1. Cargar Noticias
         const newsUnsub = onSnapshot(query(collection(db, "news_ticker"), orderBy("createdAt", "desc")), (snap) => setNews(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+        
+        // 2. Cargar Quizzes
         const quizUnsub = onSnapshot(query(collection(db, "training_modules"), where("active", "==", true)), (snap) => setQuizzes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+        
+        // 3. Cargar Progreso de Usuario
         const progressUnsub = onSnapshot(doc(db, "users", user.uid), (docSnap) => {
             if (docSnap.exists()) {
                 setUserQuizProgress(docSnap.data().quizProgress || {});
@@ -168,19 +174,70 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
             }
         });
         
-        // --- 🔥 CARGAR REPORTES PASADOS (CRÍTICO) 🔥 ---
-        // Esto asegura que al abrir la app veas los reportes que ya existen en Firebase
+       // --- 🔥 CARGAR REPORTES (V4: RECONSTRUCCIÓN DE DATOS) 🔥 ---
         const reportsUnsub = onSnapshot(query(collection(db, "daily_reports"), where("uid", "==", user.uid)), (snap) => {
-            const loadedReports = snap.docs.map(doc => ({
-                id: doc.data().date, // Usamos la fecha real del doc como ID
-                content: doc.data().report
-            }));
+            
+            const loadedReports = snap.docs.map(doc => {
+                const data = doc.data();
+                
+                // 1. OBTENER FECHA (Lógica Blindada)
+                let finalDate = data.date;
+                if (!finalDate && doc.id.includes('_')) {
+                    const match = doc.id.match(/(\d{4}-\d{2}-\d{2})/);
+                    if (match) finalDate = match[0];
+                }
+                if (!finalDate && data.timestamp) {
+                    finalDate = new Date(data.timestamp).toLocaleDateString('en-CA');
+                }
+
+                if (!finalDate) return null;
+
+                // 2. OBTENER CONTENIDO
+                // Intentamos leer texto directo primero
+                let content = data.report || data.content || data.text || data.body;
+
+                // 3. SI NO HAY TEXTO -> ¡LO RECONSTRUIMOS! 🛠️
+                // Usamos 'taskBreakdown' y 'metrics' que SÍ existen en tu base de datos
+                if (!content && data.taskBreakdown) {
+                    const tasks = Array.isArray(data.taskBreakdown) ? data.taskBreakdown : [];
+                    const metrics = data.metrics || {};
+                    const totalTime = metrics.formattedTime || metrics.totalTime || "00:00:00";
+                    
+                    // Generamos un reporte simple al vuelo
+                    content = `📊 REPORTE RECUPERADO (${finalDate})\n\n` +
+                              `⏱️ Tiempo Total: ${totalTime}\n` +
+                              `✅ Tareas Completadas: ${tasks.length}\n` +
+                              `-----------------------------------\n`;
+                    
+                    if (tasks.length > 0) {
+                        content += tasks.map(t => {
+                            // Intentamos obtener nombre y tiempo de varias formas posibles
+                            const name = t.name || t.text || t.taskName || "Tarea sin nombre";
+                            const time = t.timeFormatted || t.duration || t.elapsedTime || "";
+                            return `• ${name} ${time ? `(${time})` : ''}`;
+                        }).join('\n');
+                    } else {
+                        content += "No hay detalles de tareas guardados.";
+                    }
+                }
+
+                // Si después de todo no hay contenido, ponemos un aviso
+                if (!content) {
+                    content = "⚠️ Datos del reporte dañados o ilegibles.";
+                }
+
+                return {
+                    id: finalDate, 
+                    content: content 
+                };
+            }).filter(Boolean);
+
+            console.log("✅ Reportes reconstruidos:", loadedReports);
             setPastReports(loadedReports);
         });
-
-        return () => { newsUnsub(); quizUnsub(); progressUnsub(); reportsUnsub(); };
     }, [user, themeClasses.name, isIdeasModalOpen]);
 
+    
     const graduationStatus = useMemo(() => {
         if (quizzes.length === 0) return { isGraduated: false, isRusted: false };
         let passedCount = 0;
