@@ -16,32 +16,33 @@ const QuickNotesWidget = ({ user }) => {
     const [notes, setNotes] = useState([]);
     const [activeNoteId, setActiveNoteId] = useState(null);
     
-    // --- EDICIÓN DE TÍTULO ---
+    // --- NUEVO: MODO SNIPPET (Smart Copy) ---
+    const [isSnippetMode, setIsSnippetMode] = useState(false); 
+    const [copiedIndex, setCopiedIndex] = useState(null); // Para el feedback visual de "Copiado"
+
+    // --- EDICIÓN TÍTULO ---
     const [editingTitleId, setEditingTitleId] = useState(null); 
     const [tempTitle, setTempTitle] = useState(""); 
 
-    // --- ESTADOS VISUALES (PERSISTENTES) ---
-    // Intentamos leer de LocalStorage, si no existe, usamos valores por defecto
+    // --- ESTADOS PERSISTENTES (POSICIÓN/TAMAÑO) ---
     const getSavedConfig = () => {
         try {
             const saved = localStorage.getItem(`nexus_notes_config_${user?.uid}`);
             return saved ? JSON.parse(saved) : null;
         } catch (e) { return null; }
     };
-
     const savedConfig = getSavedConfig();
-
     const [position, setPosition] = useState(savedConfig?.position || { x: window.innerWidth - 80, y: window.innerHeight - 200 });
     const [size, setSize] = useState(savedConfig?.size || { width: 340, height: 450 });
 
+    // --- DRAG STATES ---
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const [startPos, setStartPos] = useState({ x: 0, y: 0 }); 
-    
-    const containerRef = useRef(null); // Referencia al contenedor de la nota
+    const containerRef = useRef(null);
     const buttonRef = useRef(null);
 
-    // --- CARGAR NOTAS DE FIREBASE ---
+    // --- CARGAR NOTAS ---
     useEffect(() => {
         if (!user) return;
         const notesRef = collection(db, `users/${user.uid}/quick_notes`);
@@ -62,14 +63,14 @@ const QuickNotesWidget = ({ user }) => {
         return () => unsubscribe();
     }, [user]);
 
-    // --- GUARDAR CONFIGURACIÓN (TAMAÑO/POSICIÓN) ---
+    // --- GUARDAR CONFIG ---
     const saveConfigToLocal = (newPos, newSize) => {
         if (!user) return;
         const config = { position: newPos, size: newSize };
         localStorage.setItem(`nexus_notes_config_${user.uid}`, JSON.stringify(config));
     };
 
-    // --- DRAG & RESIZE LOGIC ---
+    // --- DRAG LOGIC ---
     const handleMouseDown = (e) => {
         if (e.button !== 0) return;
         setIsDragging(true);
@@ -77,30 +78,16 @@ const QuickNotesWidget = ({ user }) => {
         setDragOffset({ x: e.clientX - position.x, y: e.clientY - position.y });
     };
 
-    // Capturamos el final del arrastre O el final del redimensionado
     const handleWindowMouseUp = (e) => {
-        // 1. Si estábamos arrastrando, terminamos
         if (isDragging) {
             setIsDragging(false);
             const distance = Math.sqrt(Math.pow(e.clientX - startPos.x, 2) + Math.pow(e.clientY - startPos.y, 2));
-            
-            // Si fue arrastre real (movimiento > 5px), guardamos posición nueva
-            if (distance > 5) {
-                saveConfigToLocal(position, size);
-            } else {
-                // Si fue click estático, abrimos/cerramos
-                // Nota: La lógica de toggle se maneja mejor en onClick del botón si no hubo drag, 
-                // pero aquí necesitamos guardar la pos si cambió.
-                setIsOpen(prev => !prev);
-            }
+            if (distance > 5) saveConfigToLocal(position, size);
+            else setIsOpen(prev => !prev);
         }
-
-        // 2. Si la ventana está abierta, verificamos si cambió de tamaño (Resize)
         if (isOpen && containerRef.current) {
             const currentWidth = containerRef.current.offsetWidth;
             const currentHeight = containerRef.current.offsetHeight;
-
-            // Si el tamaño actual del DOM es diferente al del estado, actualizamos y guardamos
             if (currentWidth !== size.width || currentHeight !== size.height) {
                 const newSize = { width: currentWidth, height: currentHeight };
                 setSize(newSize);
@@ -115,21 +102,17 @@ const QuickNotesWidget = ({ user }) => {
             e.preventDefault();
             setPosition({ x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y });
         };
-
-        // Usamos window para capturar cuando sueltan el mouse en cualquier lado
         if (isDragging || isOpen) {
             window.addEventListener('mousemove', handleMouseMove);
             window.addEventListener('mouseup', handleWindowMouseUp);
         }
-        
         return () => { 
             window.removeEventListener('mousemove', handleMouseMove); 
             window.removeEventListener('mouseup', handleWindowMouseUp); 
         };
     }, [isDragging, dragOffset, startPos, isOpen, position, size]);
 
-
-    // --- CRUD FIREBASE ---
+    // --- CRUD ---
     const addNote = async () => {
         const docRef = await addDoc(collection(db, `users/${user.uid}/quick_notes`), {
             title: "Nueva Nota", text: "", color: 'yellow', createdAt: Date.now(), updatedAt: Date.now()
@@ -137,6 +120,7 @@ const QuickNotesWidget = ({ user }) => {
         setActiveNoteId(docRef.id);
         setEditingTitleId(docRef.id);
         setTempTitle("Nueva Nota");
+        setIsSnippetMode(false); // Al crear, ir a modo edición
     };
     const updateNote = async (id, field, value) => {
         const noteRef = doc(db, `users/${user.uid}/quick_notes`, id);
@@ -147,10 +131,18 @@ const QuickNotesWidget = ({ user }) => {
         if(window.confirm("¿Borrar nota?")) await deleteDoc(doc(db, `users/${user.uid}/quick_notes`, id));
     };
 
-    // --- EDICIÓN TÍTULO ---
+    // --- TÍTULO ---
     const startEditingTitle = (e, note) => { e.stopPropagation(); setEditingTitleId(note.id); setTempTitle(note.title || "Nota"); };
     const saveTitle = async (id) => { if (tempTitle.trim() !== "") await updateNote(id, 'title', tempTitle); setEditingTitleId(null); };
     const handleKeyDown = (e, id) => { if (e.key === 'Enter') saveTitle(id); };
+
+    // --- 🔥 LOGICA DE SMART COPY (SNIPPETS) 🔥 ---
+    const handleCopyLine = (text, index) => {
+        if (!text.trim()) return;
+        navigator.clipboard.writeText(text.trim());
+        setCopiedIndex(index);
+        setTimeout(() => setCopiedIndex(null), 1000); // Reset feedback después de 1s
+    };
 
     const activeNote = notes.find(n => n.id === activeNoteId);
     const activeColor = activeNote ? (NOTE_COLORS.find(c => c.name === activeNote.color) || NOTE_COLORS[0]) : NOTE_COLORS[0];
@@ -163,20 +155,10 @@ const QuickNotesWidget = ({ user }) => {
                 <div 
                     ref={containerRef}
                     className="fixed z-[90] flex flex-col animate-fadeIn shadow-2xl rounded-xl overflow-hidden border border-white/20"
-                    style={{ 
-                        // Posición relativa al botón para que "surja" de ahí visualmente o posición guardada absoluta
-                        // Para simplificar el resize, usamos la posición guardada directamente como top/left
-                        left: position.x - size.width + 50, // Ajuste para que no tape el botón
-                        top: position.y - size.height - 10,
-                        width: `${size.width}px`,
-                        height: `${size.height}px`,
-                        resize: 'both',
-                        minWidth: '280px',
-                        minHeight: '200px'
-                    }}
+                    style={{ left: position.x - size.width + 50, top: position.y - size.height - 10, width: `${size.width}px`, height: `${size.height}px`, resize: 'both', minWidth: '280px', minHeight: '200px' }}
                     onMouseDown={(e) => e.stopPropagation()} 
                 >
-                    {/* --- HEADER --- */}
+                    {/* --- HEADER TABS --- */}
                     <div className="flex bg-[#2d3748] overflow-x-auto custom-scrollbar-hide cursor-move items-end pt-1 px-1 gap-1 h-9 flex-shrink-0" title="Arrastrar widget">
                         {notes.map((note, index) => {
                             const isActive = note.id === activeNoteId;
@@ -201,26 +183,84 @@ const QuickNotesWidget = ({ user }) => {
                         <button onClick={addNote} className="h-7 w-7 mb-0.5 flex items-center justify-center rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-indigo-600 transition-colors flex-shrink-0">+</button>
                     </div>
 
+                    {/* --- SUB-HEADER: CONTROLES --- */}
+                    {activeNote && (
+                        <div className={`flex justify-between items-center px-3 py-1 border-b border-black/5 ${activeColor.bg}`}>
+                            <div className="flex gap-1">
+                                <button 
+                                    onClick={() => setIsSnippetMode(false)}
+                                    className={`p-1 rounded hover:bg-black/10 transition-colors ${!isSnippetMode ? 'text-black font-bold bg-black/5' : 'text-black/40'}`}
+                                    title="Modo Edición"
+                                >
+                                    ✏️
+                                </button>
+                                <button 
+                                    onClick={() => setIsSnippetMode(true)}
+                                    className={`p-1 rounded hover:bg-black/10 transition-colors ${isSnippetMode ? 'text-blue-600 font-bold bg-blue-500/10' : 'text-black/40'}`}
+                                    title="Modo Snippets (Copiar al clic)"
+                                >
+                                    🚀
+                                </button>
+                            </div>
+                            
+                            {/* Color Picker pequeño */}
+                            <div className="flex gap-1">
+                                {NOTE_COLORS.map(c => (
+                                    <button key={c.name} onClick={() => updateNote(activeNote.id, 'color', c.name)} className={`w-3 h-3 rounded-full border border-black/10 ${c.btn} hover:scale-125 transition-transform`} />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* --- BODY --- */}
                     <div className={`flex-1 flex flex-col relative ${activeNote ? activeColor.bg : 'bg-slate-800'} overflow-hidden`}>
                         {activeNote ? (
                             <>
-                                <textarea 
-                                    className="flex-1 w-full h-full bg-transparent resize-none outline-none p-4 text-sm font-medium placeholder-black/30 leading-relaxed custom-scrollbar"
-                                    placeholder="Escribe aquí tu nota..."
-                                    value={activeNote.text}
-                                    onChange={(e) => {
-                                        const newNotes = notes.map(n => n.id === activeNote.id ? { ...n, text: e.target.value } : n);
-                                        setNotes(newNotes);
-                                    }}
-                                    onBlur={(e) => updateNote(activeNote.id, 'text', e.target.value)}
-                                    autoFocus
-                                />
-                                <div className="absolute bottom-2 right-4 flex gap-1 opacity-20 hover:opacity-100 transition-opacity bg-black/10 p-1 rounded-full backdrop-blur-sm z-10">
-                                    {NOTE_COLORS.map(c => (
-                                        <button key={c.name} onClick={() => updateNote(activeNote.id, 'color', c.name)} className={`w-4 h-4 rounded-full border border-white/20 shadow-sm ${c.btn} hover:scale-125 transition-transform`} title={c.name}/>
-                                    ))}
-                                </div>
+                                {/* --- MODO 1: EDICIÓN (TEXTAREA) --- */}
+                                {!isSnippetMode && (
+                                    <textarea 
+                                        className="flex-1 w-full h-full bg-transparent resize-none outline-none p-4 text-sm font-medium placeholder-black/30 leading-relaxed custom-scrollbar"
+                                        placeholder="Escribe aquí... (Un renglón = Un botón en modo 🚀)"
+                                        value={activeNote.text}
+                                        onChange={(e) => {
+                                            const newNotes = notes.map(n => n.id === activeNote.id ? { ...n, text: e.target.value } : n);
+                                            setNotes(newNotes);
+                                        }}
+                                        onBlur={(e) => updateNote(activeNote.id, 'text', e.target.value)}
+                                        autoFocus
+                                    />
+                                )}
+
+                                {/* --- MODO 2: SNIPPETS (SMART LIST) --- */}
+                                {isSnippetMode && (
+                                    <div className="flex-1 w-full h-full overflow-y-auto p-2 custom-scrollbar space-y-1">
+                                        {activeNote.text.trim() === "" ? (
+                                            <div className="text-center mt-10 text-black/40 text-xs italic">
+                                                Escribe algo en modo ✏️ para ver tus snippets aquí.
+                                            </div>
+                                        ) : (
+                                            activeNote.text.split('\n').map((line, idx) => {
+                                                if (!line.trim()) return <div key={idx} className="h-2"></div>; // Espaciador para líneas vacías
+                                                const isCopied = copiedIndex === idx;
+                                                return (
+                                                    <div 
+                                                        key={idx}
+                                                        onClick={() => handleCopyLine(line, idx)}
+                                                        className={`
+                                                            group flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-all text-sm font-medium border border-black/5
+                                                            ${isCopied ? 'bg-green-500 text-white shadow-md transform scale-[1.02]' : 'bg-white/40 hover:bg-white/80 hover:shadow-sm text-slate-800'}
+                                                        `}
+                                                    >
+                                                        <span className="truncate">{line}</span>
+                                                        <span className={`text-[10px] font-bold ${isCopied ? 'text-white' : 'text-transparent group-hover:text-black/30'}`}>
+                                                            {isCopied ? '¡COPIADO!' : 'COPIAR'}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                )}
                             </>
                         ) : (
                             <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
