@@ -1,35 +1,20 @@
 // src/utils/reportGenerator.js
 
 /**
- * Genera el reporte de fin de día en formato texto.
- * @param {Array} tasks - Lista de tareas del usuario
- * @param {string} dateStr - Fecha en formato YYYY-MM-DD
- * @param {string} themeName - Nombre del tema actual para los iconos
- * @returns {string} El texto formateado del reporte
+ * Genera el reporte de fin de día en formato texto limpio (Estilo Foto 2).
  */
 export const generateCustomReport = (tasks, dateStr, themeName) => {
     
-    // 1. Iconos por Tema
-    const THEME_ICONS = {
-        neko: '🐱', lofi: '☕', winter: '❄️', crimson: '👹', 
-        royal: '👑', forest: '🌲', neon: '⚡', galaxy: '🚀', 
-        halloween: '🎃', default: '📝'
-    };
-    const icon = THEME_ICONS[themeName] || '📝';
-
-    // 2. Formato de Fecha Largo
-    // Nota: Agregué validación por si dateStr viene vacío o mal
+    // 1. Formato de Fecha
     if (!dateStr) dateStr = new Date().toISOString().split('T')[0];
-    
     const [y, m, d] = dateStr.split('-');
-    // Aseguramos que sea fecha local correcta (mes base 0 en JS)
     const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
     
-    // Opción para inglés (como tenías) o español
+    // Opción para formato en inglés como en la foto ("Sunday, February 15, 2026")
     const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     const formattedDate = dateObj.toLocaleDateString('en-US', dateOptions); 
 
-    // 3. Helper Tiempo interno
+    // 2. Helper de Tiempo (Ej: "1h 8m")
     const formatMs = (ms) => {
         if (!ms) return '0h 0m';
         const h = Math.floor(ms / 3600000);
@@ -37,13 +22,12 @@ export const generateCustomReport = (tasks, dateStr, themeName) => {
         return `${h}h ${min}m`;
     };
 
-    // 4. Calcular Totales
+    // 3. Calcular Totales y Agrupar por Tienda
     let totalMs = 0;
     const groups = {};
 
-    // Procesamos cada tarea
     tasks.forEach(task => {
-        // Cálculo de tiempo: Si está corriendo, sumamos el tiempo actual
+        // Calcular tiempo acumulado real
         let currentElapsed = task.elapsedTime || 0;
         if (task.running && task.lastTime) {
              currentElapsed += (Date.now() - task.lastTime);
@@ -51,31 +35,38 @@ export const generateCustomReport = (tasks, dateStr, themeName) => {
         
         totalMs += currentElapsed;
 
-        const shop = task.category || 'General';
+        // 🔥 CORRECCIÓN 1: Prioridad a 'shop', luego 'category', luego 'General'
+        const shopName = task.shop || task.category || 'General';
         
-        // Inicializamos el grupo si no existe
-        if (!groups[shop]) groups[shop] = [];
+        if (!groups[shopName]) groups[shopName] = [];
         
         // Agregamos al grupo
-        groups[shop].push({
-            name: task.rawTaskName || task.text,
-            qty: parseInt(task.quantity) || 0,
+        groups[shopName].push({
+            name: task.text || task.name || "Tarea sin nombre",
+            // 🔥 CORRECCIÓN 2: Leemos 'count' (usado en contadores) o 'quantity'
+            qty: parseInt(task.count || task.quantity) || 0,
             timeStr: formatMs(currentElapsed)
         });
     });
 
-    // 5. Construir Reporte Final
+    // 4. Construir Reporte Final
     let report = `End of Day Report: ${formattedDate}\n`;
     report += `Hours worked: ${formatMs(totalMs)}\n\n`;
-    report += `Today I worked on the following tasks:\n\n`;
+    report += `Today I worked on the following tasks:\n`; // Quitamos un salto de línea extra para pegar más el contenido
 
+    // Ordenamos las tiendas alfabéticamente
     Object.keys(groups).sort().forEach(shopName => {
+        // Separador de Tienda
         report += `--- ${shopName} ---\n`;
+        
         groups[shopName].forEach(item => {
             const qtyPart = item.qty > 0 ? ` (${item.qty} orders)` : '';
-            report += `${icon} ${item.name}${qtyPart}: ${item.timeStr}\n`;
+            // 🔥 CORRECCIÓN 3: Quitamos el icono para que sea texto limpio
+            report += `${item.name}${qtyPart}: ${item.timeStr}\n`;
         });
-        report += '\n'; // Espacio extra entre grupos
+        
+        // Espacio entre grupos (opcional, la foto 2 no parece tener mucho espacio)
+        // report += '\n'; 
     });
 
     return report;
