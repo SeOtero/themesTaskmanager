@@ -174,7 +174,7 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
             }
         });
         
-       // --- 🔥 CARGAR REPORTES (V4: RECONSTRUCCIÓN DE DATOS) 🔥 ---
+       // --- 🔥 CARGAR REPORTES (V5: RECONSTRUCCIÓN CON TIEMPOS REALES) 🔥 ---
         const reportsUnsub = onSnapshot(query(collection(db, "daily_reports"), where("uid", "==", user.uid)), (snap) => {
             
             const loadedReports = snap.docs.map(doc => {
@@ -196,32 +196,41 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
                 // Intentamos leer texto directo primero
                 let content = data.report || data.content || data.text || data.body;
 
-                // 3. SI NO HAY TEXTO -> ¡LO RECONSTRUIMOS! 🛠️
-                // Usamos 'taskBreakdown' y 'metrics' que SÍ existen en tu base de datos
+                // 3. SI NO HAY TEXTO -> ¡RECONSTRUCCIÓN MATEMÁTICA! 🧮
                 if (!content && data.taskBreakdown) {
                     const tasks = Array.isArray(data.taskBreakdown) ? data.taskBreakdown : [];
-                    const metrics = data.metrics || {};
-                    const totalTime = metrics.formattedTime || metrics.totalTime || "00:00:00";
                     
-                    // Generamos un reporte simple al vuelo
+                    // Función interna para formatear MS a HH:MM:SS
+                    const formatMs = (ms) => {
+                        if (!ms || isNaN(ms)) return "00:00:00";
+                        const seconds = Math.floor((ms / 1000) % 60);
+                        const minutes = Math.floor((ms / (1000 * 60)) % 60);
+                        const hours = Math.floor((ms / (1000 * 60 * 60)));
+                        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    };
+
+                    // Calcular total real sumando el tiempo de cada tarea
+                    const totalMs = tasks.reduce((acc, t) => acc + (t.elapsedTime || 0), 0);
+                    const totalTimeStr = formatMs(totalMs);
+                    
                     content = `📊 REPORTE RECUPERADO (${finalDate})\n\n` +
-                              `⏱️ Tiempo Total: ${totalTime}\n` +
-                              `✅ Tareas Completadas: ${tasks.length}\n` +
+                              `⏱️ Tiempo Total Real: ${totalTimeStr}\n` +
+                              `✅ Tareas Realizadas: ${tasks.length}\n` +
                               `-----------------------------------\n`;
                     
                     if (tasks.length > 0) {
                         content += tasks.map(t => {
-                            // Intentamos obtener nombre y tiempo de varias formas posibles
                             const name = t.name || t.text || t.taskName || "Tarea sin nombre";
-                            const time = t.timeFormatted || t.duration || t.elapsedTime || "";
-                            return `• ${name} ${time ? `(${time})` : ''}`;
+                            // Si tiene tiempo formateado úsalo, si no, calcúlalo desde elapsedTime
+                            const time = t.timeFormatted || formatMs(t.elapsedTime);
+                            return `• ${name} (${time})`;
                         }).join('\n');
                     } else {
                         content += "No hay detalles de tareas guardados.";
                     }
                 }
 
-                // Si después de todo no hay contenido, ponemos un aviso
+                // Fallback final
                 if (!content) {
                     content = "⚠️ Datos del reporte dañados o ilegibles.";
                 }
@@ -232,7 +241,7 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
                 };
             }).filter(Boolean);
 
-            console.log("✅ Reportes reconstruidos:", loadedReports);
+            console.log("✅ Reportes procesados con tiempos:", loadedReports);
             setPastReports(loadedReports);
         });
     }, [user, themeClasses.name, isIdeasModalOpen]);
