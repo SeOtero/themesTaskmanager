@@ -1,16 +1,15 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 const ReportConfigModal = ({ isOpen, onClose, onGenerate, tasks, distributeTasksTime, themeClasses, selectedReportDate, setSelectedReportDate, pastReports = [] }) => {
     
-    if (!isOpen) return null;
-
-    // --- ESTADOS ---
+    // --- 1. HOOKS (SIEMPRE DEBEN IR PRIMERO) ---
+    const dateInputRef = useRef(null); 
     const [showOverwriteWarning, setShowOverwriteWarning] = useState(false);
     const [webWorkTime, setWebWorkTime] = useState(''); 
     const [appTotalString, setAppTotalString] = useState("00:00:00");
     const [selectedTaskIds, setSelectedTaskIds] = useState([]); 
 
-    // --- CÁLCULOS EN VIVO ---
+    // Cálculos (Hooks)
     const currentTotalMs = useMemo(() => {
         return tasks.reduce((acc, t) => {
             const currentSession = t.running ? (Date.now() - t.lastTime) : 0;
@@ -25,7 +24,10 @@ const ReportConfigModal = ({ isOpen, onClose, onGenerate, tasks, distributeTasks
         setAppTotalString(`${h}:${m}:${s}`);
     }, [currentTotalMs]);
 
-    // --- HELPERS ---
+    // --- 2. CONDICIÓN DE SALIDA (AHORA SÍ ES SEGURO PONERLA AQUÍ) ---
+    if (!isOpen) return null;
+
+    // --- 3. HELPERS Y HANDLERS ---
     const getFormattedDate = (isoDate) => {
         if (!isoDate) return "DD/MM/YYYY";
         const [year, month, day] = isoDate.split('-');
@@ -52,18 +54,21 @@ const ReportConfigModal = ({ isOpen, onClose, onGenerate, tasks, distributeTasks
     const targetMs = parseTimeStringToMs(webWorkTime);
     const differenceMs = targetMs - currentTotalMs; 
 
-    // --- HANDLERS ---
-    
-    // ✅ CORRECCIÓN AQUÍ: Solo llamamos a onGenerate(), no intentamos generar el texto aquí.
+    // Función para abrir el calendario (Click en todo el contenedor)
+    const handleContainerClick = () => {
+        if (dateInputRef.current) {
+            try {
+                dateInputRef.current.showPicker();
+            } catch (error) {
+                dateInputRef.current.focus(); 
+                dateInputRef.current.click();
+            }
+        }
+    };
+
     const handleConfirmClick = () => {
         const reportExists = Array.isArray(pastReports) && pastReports.some(r => r.id === selectedReportDate);
-        
-        if (reportExists) { 
-            setShowOverwriteWarning(true); 
-        } else { 
-            // Simplemente avisamos al padre (App.jsx) que proceda
-            onGenerate(); 
-        }
+        if (reportExists) { setShowOverwriteWarning(true); } else { onGenerate(); }
     };
 
     const handleTimeChange = (e) => {
@@ -75,9 +80,7 @@ const ReportConfigModal = ({ isOpen, onClose, onGenerate, tasks, distributeTasks
     };
 
     const toggleTaskSelection = (taskId) => {
-        setSelectedTaskIds(prev => 
-            prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
-        );
+        setSelectedTaskIds(prev => prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]);
     };
 
     const handleSelectAll = () => {
@@ -103,7 +106,6 @@ const ReportConfigModal = ({ isOpen, onClose, onGenerate, tasks, distributeTasks
                         <h3 className="text-xl font-bold text-red-400 mb-2">¡Cuidado!</h3>
                         <p className="text-gray-300 mb-6">Ya existe un reporte para esta fecha.</p>
                         <div className="flex flex-col gap-3 w-full">
-                            {/* ✅ CORRECCIÓN: Aquí también solo llamamos a onGenerate */}
                             <button onClick={() => onGenerate()} className="w-full py-3 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition shadow-lg">Sí, Sobreescribir</button>
                             <button onClick={() => setShowOverwriteWarning(false)} className="w-full py-3 rounded-xl font-bold text-gray-300 bg-gray-700 hover:bg-gray-600 transition">Cancelar</button>
                         </div>
@@ -113,10 +115,21 @@ const ReportConfigModal = ({ isOpen, onClose, onGenerate, tasks, distributeTasks
                         <h2 className={`text-xl font-bold mb-4 text-center ${themeClasses.primaryText}`}>Preparar Reporte</h2>
                         
                         <div className="mb-4 flex justify-center">
-                            <div className="relative group cursor-pointer border border-cyan-500/30 bg-black/40 px-4 py-2 rounded-lg flex items-center gap-2">
-                                <span className="text-white font-mono">{getFormattedDate(selectedReportDate)}</span>
-                                <span className="text-cyan-400">📅</span>
-                                <input type="date" value={selectedReportDate} onChange={(e) => setSelectedReportDate(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" />
+                            {/* CONTENEDOR CLICKABLE QUE ABRE CALENDARIO */}
+                            <div 
+                                onClick={handleContainerClick} 
+                                className="relative group cursor-pointer border border-cyan-500/30 bg-black/40 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-black/60 transition-colors"
+                            >
+                                <span className="text-white font-mono pointer-events-none select-none">{getFormattedDate(selectedReportDate)}</span>
+                                <span className="text-cyan-400 pointer-events-none">📅</span>
+                                
+                                <input 
+                                    ref={dateInputRef} 
+                                    type="date" 
+                                    value={selectedReportDate} 
+                                    onChange={(e) => setSelectedReportDate(e.target.value)} 
+                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
+                                />
                             </div>
                         </div>
 
