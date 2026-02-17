@@ -122,21 +122,86 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
     }, [activeTab, activeWeekId, filterDate, selectedTeam, viewMode]); 
 
     // --- HANDLERS ---
-    const fetchTeamData = async () => { /* ... */ 
-        setIsLoading(true); setTeamReports([]); setProcessedData([]);
+   // --- FUNCIÓN DE CARGA DE DATOS OPTIMIZADA (ZERO-WASTE) ---
+    const fetchTeamData = async () => {
+        setIsLoading(true);
+        setTeamReports([]);
+        setProcessedData([]); 
+
         try {
             const range = getDateRange();
             const reportsRef = collection(db, 'daily_reports');
-            let q = selectedTeam === 'ALL_TEAMS' ? query(reportsRef, where("date", ">=", range.start), where("date", "<=", range.end)) : query(reportsRef, where("team", "==", selectedTeam), where("date", ">=", range.start), where("date", "<=", range.end));
+            
+            // 🛡️ CONSTRUCCIÓN DE LA CONSULTA SEGURA
+            const constraints = [
+                where("date", ">=", range.start),
+                where("date", "<=", range.end),
+                orderBy("date", "desc")
+            ];
+
+            if (selectedTeam !== 'ALL_TEAMS') {
+                constraints.push(where("team", "==", selectedTeam));
+            }
+
+            // 🚨 EL FRENO DE SEGURIDAD: Límite de 100 reportes
+            constraints.push(limit(100));
+
+            const q = query(reportsRef, ...constraints);
             const querySnapshot = await getDocs(q);
+            
             const rawReports = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setTeamReports(rawReports);
-            const aggregated = {}; rawReports.forEach(rep => { if (!aggregated[rep.uid]) aggregated[rep.uid] = { id: rep.uid, uid: rep.uid, userName: rep.userName, team: rep.team, totalTasks: 0, totalTimeMs: 0, taskBreakdownMap: {}, lastUpdate: rep.timestampStr }; const agent = aggregated[rep.uid]; agent.totalTasks += (rep.metrics?.totalTasks || 0); agent.totalTimeMs += (rep.metrics?.totalTimeMs || 0); agent.lastUpdate = rep.timestampStr || formatDateDisplay(rep.date); if (rep.taskBreakdown) rep.taskBreakdown.forEach(task => { if (!agent.taskBreakdownMap[task.name]) agent.taskBreakdownMap[task.name] = { count: 0, timeMs: 0 }; agent.taskBreakdownMap[task.name].count += (task.count || 0); agent.taskBreakdownMap[task.name].timeMs += (task.timeMs || 0); }); });
-            const finalData = Object.values(aggregated).map(agent => { const breakdown = Object.entries(agent.taskBreakdownMap).map(([name, data]) => { const hours = data.timeMs / 3600000; return { name, count: data.count, timeMs: data.timeMs, speed: hours > 0 ? (data.count / hours).toFixed(2) : "0.00" }; }); const totalHours = agent.totalTimeMs / 3600000; const globalSpeed = totalHours > 0 ? (agent.totalTasks / totalHours).toFixed(2) : "0.00"; return { ...agent, metrics: { totalTasks: agent.totalTasks, totalTimeMs: agent.totalTimeMs, globalSpeed: globalSpeed }, taskBreakdown: breakdown, timestampStr: agent.lastUpdate }; });
-            setProcessedData(finalData);
-        } catch (error) { console.error("Error:", error); } setIsLoading(false);
-    };
 
+            // --- PROCESAMIENTO DE DATOS (EN MEMORIA) ---
+            const aggregated = {}; 
+            
+            rawReports.forEach(rep => { 
+                if (!aggregated[rep.uid]) {
+                    aggregated[rep.uid] = { 
+                        id: rep.uid, 
+                        uid: rep.uid, 
+                        userName: rep.userName || "Usuario Desconocido", 
+                        team: rep.team || "Sin Equipo", 
+                        totalTasks: 0, 
+                        totalTimeMs: 0, 
+                        taskBreakdownMap: {}, 
+                        lastUpdate: rep.timestampStr || rep.date 
+                    }; 
+                }
+                
+                const agent = aggregated[rep.uid]; 
+                agent.totalTasks += (rep.metrics?.totalTasks || 0); 
+                agent.totalTimeMs += (rep.metrics?.totalTimeMs || 0); 
+                if (rep.timestampStr > agent.lastUpdate) agent.lastUpdate = rep.timestampStr; 
+                
+                if (Array.isArray(rep.taskBreakdown)) {
+                    rep.taskBreakdown.forEach(task => { 
+                        const tName = task.name || task.text || "Tarea Genérica";
+                        if (!agent.taskBreakdownMap[tName]) agent.taskBreakdownMap[tName] = { count: 0, timeMs: 0 }; 
+                        agent.taskBreakdownMap[tName].count += (task.count || 1); 
+                        agent.taskBreakdownMap[tName].timeMs += (task.elapsedTime || task.timeMs || 0); 
+                    }); 
+                }
+            });
+
+            const finalData = Object.values(aggregated).map(agent => { 
+                const breakdown = Object.entries(agent.taskBreakdownMap).map(([name, data]) => { 
+                    const hours = data.timeMs / 3600000; 
+                    return { name, count: data.count, timeMs: data.timeMs, speed: hours > 0 ? (data.count / hours).toFixed(2) : "0.00" }; 
+                }); 
+                const totalHours = agent.totalTimeMs / 3600000; 
+                const globalSpeed = totalHours > 0 ? (agent.totalTasks / totalHours).toFixed(2) : "0.00"; 
+                return { ...agent, metrics: { totalTasks: agent.totalTasks, totalTimeMs: agent.totalTimeMs, globalSpeed: globalSpeed }, taskBreakdown: breakdown, timestampStr: agent.lastUpdate }; 
+            });
+            
+            setProcessedData(finalData);
+
+        } catch (error) { 
+            console.error("Error cargando reportes:", error); 
+        } finally {
+            setIsLoading(false);
+        }
+    };
     // ... (Mantén el resto de handlers igual: fetchIdeas, getDateRange, etc.) ...
     const fetchIdeas = async () => { setIdeasLoading(true); try { let q = query(collection(db, "monday_ideas"), orderBy("timestamp", "desc")); const snap = await getDocs(q); let docs = snap.docs.map(d => ({id: d.id, ...d.data()})); if (!isAdmin) docs = docs.filter(d => d.type !== 'dev'); setTeamIdeas(docs); } catch (e) { console.error(e); } setIdeasLoading(false); };
     const getDateRange = () => { const [yearStr, monthStr, dayStr] = filterDate.split('-'); const date = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr)); const toISODate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; if (viewMode === 'daily') return { start: filterDate, end: filterDate }; if (viewMode === 'weekly') { const day = date.getDay(); const diff = date.getDate() - day + (day === 0 ? -6 : 1); const m = new Date(date); m.setDate(diff); const s = new Date(m); s.setDate(m.getDate() + 6); return { start: toISODate(m), end: toISODate(s), startDateObj: m, endDateObj: s }; } if (viewMode === 'monthly') { const f = new Date(date.getFullYear(), date.getMonth(), 1); const l = new Date(date.getFullYear(), date.getMonth() + 1, 0); return { start: toISODate(f), end: toISODate(l), startDateObj: f, endDateObj: l }; } return { start: filterDate, end: filterDate }; };

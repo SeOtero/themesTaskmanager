@@ -1,24 +1,44 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useFirestoreDoc } from './useFirestore'; 
 import { commonTaskOptions, shopSpecificCallTasks } from '../data/constants';
 
 export const useTasks = (user) => {
-    // Usamos Firestore para persistir tareas
+    // Usamos Firestore para persistir tareas (Solo lecturas iniciales y escrituras finales)
     const [tasks, setTasks] = useFirestoreDoc('data', 'tasks', [], user); 
     const [errorMessage, setErrorMessage] = useState('');
     const [statusMessage, setStatusMessage] = useState(null); 
     
-    // Timer para actualizar la interfaz cada segundo si hay tareas corriendo
+    // Ref para evitar re-renders innecesarios en el intervalo
+    const tasksRef = useRef(tasks);
+    useEffect(() => { tasksRef.current = tasks; }, [tasks]);
+
+    // --- OPTIMIZACIÓN DEL TIMER ---
+    // En lugar de actualizar el estado 'tasks' cada segundo (que re-renderiza TODA la app),
+    // usamos un "forceUpdate" local solo si hay tareas corriendo.
+    const [, setTick] = useState(0);
+    
     useEffect(() => {
         const interval = setInterval(() => {
-            if (tasks && tasks.some(t => t.running)) {
-                // Forzamos re-render pasando una copia nueva del array
-                setTasks([...tasks]); 
+            // Solo forzamos render si hay alguna tarea corriendo
+            if (tasksRef.current && tasksRef.current.some(t => t.running)) {
+                setTick(t => t + 1); 
             }
         }, 1000);
         return () => clearInterval(interval);
-    }, [tasks, setTasks]);
+    }, []);
     
+    // Helper para calcular tiempo visual en tiempo real sin guardar en DB
+    const getVisualTasks = useCallback(() => {
+        const now = Date.now();
+        return tasks.map(t => {
+            if (t.running) {
+                // Calculamos tiempo "al vuelo" para mostrar, pero NO guardamos en DB todavía
+                return { ...t, elapsedTime: t.elapsedTime + (now - t.lastTime) };
+            }
+            return t;
+        });
+    }, [tasks]); // Depende de tasks, se actualiza cuando tasks cambia o cuando forzamos render con setTick
+
     // --- AGREGAR MÚLTIPLES TAREAS ---
     const addMultipleTasks = useCallback((newTasksData) => {
         const tasksToAdd = [];
@@ -74,17 +94,38 @@ export const useTasks = (user) => {
         setErrorMessage(''); 
     }, [setTasks]);
     
+    // --- TOGGLE TIMER (PLAY/PAUSE) ---
     const toggleTimer = useCallback((id) => {
         const now = Date.now();
         const updatedTasks = tasks.map(t => {
-            if (t.running && t.id !== id) return { ...t, running: false, elapsedTime: t.elapsedTime + (now - t.lastTime), lastTime: null };
+            // Si paramos otra tarea que estaba corriendo
+            if (t.running && t.id !== id) {
+                return { 
+                    ...t, 
+                    running: false, 
+                    elapsedTime: t.elapsedTime + (now - t.lastTime), 
+                    lastTime: null 
+                };
+            }
+            // La tarea que tocamos
             if (t.id === id) {
                 const newRunning = !t.running;
-                return { ...t, running: newRunning, elapsedTime: newRunning ? t.elapsedTime : (t.elapsedTime + (now - t.lastTime)), lastTime: newRunning ? now : null };
+                if (newRunning) {
+                    // PLAY: Solo guardamos "lastTime" (marca de inicio). No cambiamos elapsedTime aún.
+                    return { ...t, running: true, lastTime: now };
+                } else {
+                    // PAUSE: Aquí sí "consolidamos" el tiempo y guardamos en DB
+                    return { 
+                        ...t, 
+                        running: false, 
+                        elapsedTime: t.elapsedTime + (now - t.lastTime), 
+                        lastTime: null 
+                    };
+                }
             }
             return t;
         });
-        setTasks(updatedTasks);
+        setTasks(updatedTasks); // Esto dispara la escritura en Firestore (useFirestoreDoc)
     }, [tasks, setTasks]);
 
     const stopAllTimers = useCallback(() => {
@@ -96,6 +137,7 @@ export const useTasks = (user) => {
             if (t.running) {
                 tasksStopped = true;
                 lastRunningTaskId = t.id;
+                // Consolidamos tiempo al parar
                 return { ...t, running: false, elapsedTime: t.elapsedTime + (now - t.lastTime), lastTime: null };
             }
             return t;
@@ -136,11 +178,6 @@ export const useTasks = (user) => {
 
     const sortTasksByShop = useCallback(() => setTasks([...tasks].sort((a, b) => a.shop.localeCompare(b.shop))), [tasks, setTasks]);
     
-    // -----------------------------------------------------------------------
-    // ✅ CORRECCIÓN CRÍTICA: distributeTasksTime
-    // Calculamos el array nuevo completo ANTES de llamar a setTasks.
-    // Esto evita el error "Unsupported field value: a function" en Firebase.
-    // -----------------------------------------------------------------------
     const distributeTasksTime = useCallback((taskIds, totalMs) => {
         if (!taskIds || taskIds.length === 0) return;
 
@@ -148,33 +185,19 @@ export const useTasks = (user) => {
         const remainder = totalMs % taskIds.length;
         let remainderApplied = false;
 
-        // Usamos 'tasks' directamente (que está en el scope del hook)
         const updatedTasks = tasks.map(task => {
             if (taskIds.includes(task.id)) {
                 let adjustment = msPerTask;
-
-                if (!remainderApplied) {
-                    adjustment += remainder;
-                    remainderApplied = true;
-                }
-
-                // Sumamos (o restamos si es negativo) y evitamos que baje de 0
+                if (!remainderApplied) { adjustment += remainder; remainderApplied = true; }
                 const newTime = Math.max(0, task.elapsedTime + adjustment);
                 return { ...task, elapsedTime: newTime };
             }
             return task;
         });
-
-        // ✅ Pasamos el array directo, NO una función
         setTasks(updatedTasks);
     }, [tasks, setTasks]);
 
-    // -----------------------------------------------------------------------
-    // ✅ CORRECCIÓN CRÍTICA: syncTasksTime
-    // Misma corrección: usar datos directos en lugar de setTasks(prev => ...)
-    // -----------------------------------------------------------------------
     const syncTasksTime = useCallback((input, mode, specificTaskId) => {
-        // CASO 1: Ajuste directo por número (Diferencia total)
         if (typeof input === 'number') {
             const difference = input;
             if (tasks.length === 0) return;
@@ -194,7 +217,6 @@ export const useTasks = (user) => {
             return;
         }
 
-        // Modo Legacy (input texto)
         let targetMs = 0;
         const strVal = input.toString().trim();
 
@@ -241,8 +263,10 @@ export const useTasks = (user) => {
         
     }, [tasks, setTasks]);
 
+    // Retornamos 'getVisualTasks()' para renderizar en UI (incluye el tiempo corriendo)
+    // Pero 'tasks' sigue siendo la fuente de verdad para la base de datos
     return { 
-        tasks, 
+        tasks: getVisualTasks(), // <--- CAMBIO CLAVE: La UI recibe la versión "viva"
         errorMessage, setErrorMessage, 
         addTask, addMultipleTasks, 
         deleteTask, deleteAllTasks, 

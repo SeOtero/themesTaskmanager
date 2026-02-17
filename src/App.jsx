@@ -1,7 +1,7 @@
 /* ==================================================================================
    SECCIÓN 1: IMPORTS Y DEPENDENCIAS
    ================================================================================== */
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from 'react';
 
 // --- CUSTOM HOOKS ---
 import { useWallet }  from './hooks/useWallet';
@@ -17,9 +17,9 @@ import { birthdaysList } from './data/constants';
 import { THEMES } from './data/themes'; 
 import { getTodayID, getCurrentWeekID } from './utils/helpers';
 
-// --- FIREBASE ---
-import { doc, getDoc, updateDoc, collection, addDoc, query, where, orderBy, onSnapshot } from 'firebase/firestore'; 
-import { db } from './firebase'; 
+// --- FIREBASE (Importamos limit para ahorrar lecturas) ---
+import { doc, getDoc, updateDoc, collection, addDoc, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore'; 
+import { db } from './firebase'; // ⚠️ Asegúrate que este nombre coincida con tu archivo (firebase.js o config.js)
 
 // --- COMPONENTS ---
 import TeamLeaderView from './components/dashboard/TeamLeaderView'; 
@@ -35,15 +35,19 @@ import ThemeSelectorWidget from './components/ui/ThemeSelector';
 import FloatingSalaryButton from './components/ui/FloatingSalaryButton';
 import NewsTicker from './components/ui/NewsTicker';
 import FloatingActions from './components/ui/FloatingActions';
-import QuickNotesWidget from './components/tools/QuickNotesWidget'; // ✅ Ruta corregida
-// --- MODALES ---
+import QuickNotesWidget from './components/tools/QuickNotesWidget';
+
+// --- MODALES CON LAZY LOADING (AHORRO DE MEMORIA) ---
+// Estos componentes no se descargarán hasta que el usuario haga click
+const SalaryCalculatorModal = lazy(() => import('./components/modals/SalaryCalculatorModal'));
+const IdeasModal = lazy(() => import('./components/modals/IdeasModal'));
+const MarketplaceModal = lazy(() => import('./components/modals/MarketplaceModal'));
+const QuizModal = lazy(() => import('./components/modals/QuizModal'));
+const AvailabilityModal = lazy(() => import('./components/modals/AvailabilityModal'));
+
+// Modales ligeros (se cargan normal)
 import ReportConfigModal from './components/modals/ReportConfigModal';
-import SalaryCalculatorModal from './components/modals/SalaryCalculatorModal';
-import IdeasModal from './components/modals/IdeasModal';
-import MarketplaceModal from './components/modals/MarketplaceModal';
 import DeleteAllConfirmationModal from './components/modals/DeleteAllConfirmationModal';
-import QuizModal from './components/modals/QuizModal';
-import AvailabilityModal from './components/modals/AvailabilityModal';
 
 // --- EFFECTS ---
 import { EFFECT_COMPONENTS, SpiderWeb } from './components/effects/BackgroundEffects';
@@ -155,32 +159,37 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
         try { await addDoc(collection(db, "app_analytics"), { eventName, uid: user.uid, timestamp: Date.now(), data }); } catch (e) { console.error("Log error", e); }
     };
 
+    // --- EFECTO 1: CARGA DE DATOS OPTIMIZADA ---
     useEffect(() => {
         if (!user) return;
 
-        // 1. Cargar Noticias
-        const newsUnsub = onSnapshot(query(collection(db, "news_ticker"), orderBy("createdAt", "desc")), (snap) => setNews(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+        // 1. Cargar Noticias (Solo las últimas 5)
+        const newsQuery = query(collection(db, "news_ticker"), orderBy("createdAt", "desc"), limit(5));
+        const newsUnsub = onSnapshot(newsQuery, (snap) => setNews(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
         
         // 2. Cargar Quizzes
         const quizUnsub = onSnapshot(query(collection(db, "training_modules"), where("active", "==", true)), (snap) => setQuizzes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
         
-        // 3. Cargar Progreso de Usuario
+        // 3. Cargar Progreso
         const progressUnsub = onSnapshot(doc(db, "users", user.uid), (docSnap) => {
             if (docSnap.exists()) {
                 setUserQuizProgress(docSnap.data().quizProgress || {});
-                if (docSnap.data().currentSkin !== themeClasses.name) {
-                    updateDoc(doc(db, "users", user.uid), { currentSkin: themeClasses.name }); 
-                }
             }
         });
         
-       // --- 🔥 CARGAR REPORTES (V5: RECONSTRUCCIÓN CON TIEMPOS REALES) 🔥 ---
-        const reportsUnsub = onSnapshot(query(collection(db, "daily_reports"), where("uid", "==", user.uid)), (snap) => {
-            
+        // 4. 🔥 CARGAR REPORTES (LIMITADO A 45 DÍAS + RECONSTRUCCIÓN) 🔥
+        const reportsQuery = query(
+            collection(db, "daily_reports"), 
+            where("uid", "==", user.uid),
+            orderBy("date", "desc"), // Orden descendente (nuevos primero)
+            limit(45) // Límite estricto de lectura
+        );
+
+        const reportsUnsub = onSnapshot(reportsQuery, (snap) => {
             const loadedReports = snap.docs.map(doc => {
                 const data = doc.data();
                 
-                // 1. OBTENER FECHA (Lógica Blindada)
+                // A. Recuperar Fecha
                 let finalDate = data.date;
                 if (!finalDate && doc.id.includes('_')) {
                     const match = doc.id.match(/(\d{4}-\d{2}-\d{2})/);
@@ -189,62 +198,60 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
                 if (!finalDate && data.timestamp) {
                     finalDate = new Date(data.timestamp).toLocaleDateString('en-CA');
                 }
-
                 if (!finalDate) return null;
 
-                // 2. OBTENER CONTENIDO
-                // Intentamos leer texto directo primero
+                // B. Recuperar o Reconstruir Contenido
                 let content = data.report || data.content || data.text || data.body;
-
-                // 3. SI NO HAY TEXTO -> ¡RECONSTRUCCIÓN MATEMÁTICA! 🧮
+                
                 if (!content && data.taskBreakdown) {
                     const tasks = Array.isArray(data.taskBreakdown) ? data.taskBreakdown : [];
-                    
-                    // Función interna para formatear MS a HH:MM:SS
                     const formatMs = (ms) => {
                         if (!ms || isNaN(ms)) return "00:00:00";
-                        const seconds = Math.floor((ms / 1000) % 60);
-                        const minutes = Math.floor((ms / (1000 * 60)) % 60);
-                        const hours = Math.floor((ms / (1000 * 60 * 60)));
-                        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                        const s = Math.floor((ms / 1000) % 60);
+                        const m = Math.floor((ms / (1000 * 60)) % 60);
+                        const h = Math.floor((ms / (1000 * 60 * 60)));
+                        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
                     };
-
-                    // Calcular total real sumando el tiempo de cada tarea
                     const totalMs = tasks.reduce((acc, t) => acc + (t.elapsedTime || 0), 0);
-                    const totalTimeStr = formatMs(totalMs);
                     
                     content = `📊 REPORTE RECUPERADO (${finalDate})\n\n` +
-                              `⏱️ Tiempo Total Real: ${totalTimeStr}\n` +
+                              `⏱️ Tiempo Total Real: ${formatMs(totalMs)}\n` +
                               `✅ Tareas Realizadas: ${tasks.length}\n` +
                               `-----------------------------------\n`;
                     
                     if (tasks.length > 0) {
                         content += tasks.map(t => {
                             const name = t.name || t.text || t.taskName || "Tarea sin nombre";
-                            // Si tiene tiempo formateado úsalo, si no, calcúlalo desde elapsedTime
                             const time = t.timeFormatted || formatMs(t.elapsedTime);
                             return `• ${name} (${time})`;
                         }).join('\n');
-                    } else {
-                        content += "No hay detalles de tareas guardados.";
-                    }
+                    } else content += "Sin detalles.";
                 }
 
-                // Fallback final
-                if (!content) {
-                    content = "⚠️ Datos del reporte dañados o ilegibles.";
-                }
-
-                return {
-                    id: finalDate, 
-                    content: content 
-                };
+                return { id: finalDate, content: content || "Datos ilegibles" };
             }).filter(Boolean);
 
-            console.log("✅ Reportes procesados con tiempos:", loadedReports);
             setPastReports(loadedReports);
+        }, (error) => {
+            console.warn("⚠️ Firebase requiere un índice. Haz clic en el enlace de la consola:", error);
         });
-    }, [user, themeClasses.name, isIdeasModalOpen]);
+
+        // Limpieza
+        return () => { newsUnsub(); quizUnsub(); progressUnsub(); reportsUnsub(); };
+
+    }, [user]); 
+
+
+    // --- EFECTO 2: GUARDAR SKIN (CON DEBOUNCE) ---
+    useEffect(() => {
+        if (user && themeClasses.name) {
+            const timeoutId = setTimeout(() => {
+                updateDoc(doc(db, "users", user.uid), { currentSkin: themeClasses.name })
+                    .catch((e) => console.log("Skin sync skip", e));
+            }, 2000);
+            return () => clearTimeout(timeoutId);
+        }
+    }, [themeClasses.name, user]);
 
     
     const graduationStatus = useMemo(() => {
@@ -291,28 +298,12 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
         } catch (e) { console.error(e); }
     };
 
-    // ✅ CORRECCIÓN CLAVE: Usamos la fecha seleccionada 'selectedReportDate'
     const confirmGenerateReport = () => {
         const skinName = themeClasses?.name || 'default';
-        
-        // 1. Pasamos la fecha seleccionada al hook de guardado
         handleGenerate(selectedReportDate, skinName, (textGenerated, dataSaved) => {
-            
-            // 2. Actualizamos la vista previa
             setReportOutput(textGenerated);
-            
-            // 3. Actualizamos la lista local usando la FECHA CORRECTA
-            const newReport = { 
-                id: selectedReportDate, // <--- ESTO ARREGLA EL CALENDARIO
-                content: textGenerated 
-            };
-            
-            setPastReports(prev => [
-                newReport, 
-                ...prev.filter(r => r.id !== selectedReportDate) // Evitamos duplicados
-            ]);
-            
-            // 4. Cerramos el modal
+            const newReport = { id: selectedReportDate, content: textGenerated };
+            setPastReports(prev => [newReport, ...prev.filter(r => r.id !== selectedReportDate)]);
             setIsReportModalOpen(false);
         });
     };
@@ -398,7 +389,7 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
     }, [pastReports, calendarSelectedDate]);
 
     /* ==================================================================================
-       SECCIÓN 4: RENDERIZADO
+       SECCIÓN 4: RENDERIZADO (CON SUSPENSE PARA AHORRO DE MEMORIA)
        ================================================================================== */
     return (
         <>
@@ -421,17 +412,24 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
                 setIdeaType={setIdeaType}
             />
 
-            <IdeasModal isOpen={isIdeasModalOpen} onClose={() => setIsIdeasModalOpen(false)} user={user} userProfile={userProfile} initialType={ideaType} />
-            <AvailabilityModal isOpen={isAvailabilityModalOpen} onClose={() => setIsAvailabilityModalOpen(false)} user={user} userProfile={userProfile} addCoins={addCoins} logEvent={logEvent} />
+            {/* 🔥 SUSPENSE WRAPPER: Solo carga lo que se usa 🔥 */}
+            <Suspense fallback={<div className="fixed inset-0 z-[200] pointer-events-none" />}>
+                <IdeasModal isOpen={isIdeasModalOpen} onClose={() => setIsIdeasModalOpen(false)} user={user} userProfile={userProfile} initialType={ideaType} />
+                <AvailabilityModal isOpen={isAvailabilityModalOpen} onClose={() => setIsAvailabilityModalOpen(false)} user={user} userProfile={userProfile} addCoins={addCoins} logEvent={logEvent} />
                 
+                {activeQuiz && (
+                    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+                        <QuizModal isOpen={true} quiz={activeQuiz} onClose={() => setActiveQuiz(null)} onComplete={handleQuizComplete} user={user} />
+                    </div>
+                )}
+                
+                <SalaryCalculatorModal isOpen={isSalaryModalOpen} onClose={() => setIsSalaryModalOpen(false)} pastReports={pastReports} hourlyRate={hourlyRate} setHourlyRate={setHourlyRate} themeClasses={themeClasses} />
+                
+                <MarketplaceModal isOpen={isMarketModalOpen} onClose={handleCloseShop} userCoins={lofiCoins} ownedItems={inventory} currentTheme={themeClasses.name} activePet={activePet} activeBorder={activeBorder} activeEffect={activeEffect} onBuy={handleBuyItem} onEquip={applyItemChange} onPreview={handlePreviewItem} />
+            </Suspense>
+
             {/* 🔥 WIDGET DE NOTAS 🔥 */}
             <QuickNotesWidget user={user} />
-
-            {activeQuiz && (
-                <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
-                    <QuizModal isOpen={true} quiz={activeQuiz} onClose={() => setActiveQuiz(null)} onComplete={handleQuizComplete} user={user} />
-                </div>
-            )}
 
             <BackgroundEffectsManager themeClasses={themeClasses} activeEffect={activeEffect} />
             <GlobalStatusMessage message={statusMessage} resumeAction={resumeStoppedTimers} dismissAction={clearStatusMessage} />
@@ -450,21 +448,17 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
                 setSelectedReportDate={setSelectedReportDate} 
                 pastReports={pastReports} 
             />
-            <SalaryCalculatorModal isOpen={isSalaryModalOpen} onClose={() => setIsSalaryModalOpen(false)} pastReports={pastReports} hourlyRate={hourlyRate} setHourlyRate={setHourlyRate} themeClasses={themeClasses} />
             
-            {/* 🔥 CORRECCIÓN: Cierre forzoso de modales al borrar todo 🔥 */}
             <DeleteAllConfirmationModal 
                 isOpen={isDeleteAllModalOpen} 
                 onClose={() => setIsDeleteAllModalOpen(false)} 
                 onConfirm={() => {
                     deleteAllTasks();
                     setIsDeleteAllModalOpen(false);
-                    setIsReportModalOpen(false); // <--- Seguridad extra
+                    setIsReportModalOpen(false); 
                 }} 
                 themeClasses={themeClasses} 
             />
-                
-            <MarketplaceModal isOpen={isMarketModalOpen} onClose={handleCloseShop} userCoins={lofiCoins} ownedItems={inventory} currentTheme={themeClasses.name} activePet={activePet} activeBorder={activeBorder} activeEffect={activeEffect} onBuy={handleBuyItem} onEquip={applyItemChange} onPreview={handlePreviewItem} />
 
             {/* --- CONTENEDOR PRINCIPAL --- */}
             <div className="app-container relative z-10 flex flex-col items-center justify-center py-10 mt-8">

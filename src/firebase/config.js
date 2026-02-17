@@ -1,6 +1,11 @@
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { 
+    initializeFirestore, 
+    persistentLocalCache, 
+    persistentMultipleTabManager,
+    getFirestore 
+} from "firebase/firestore";
 
 const firebaseConfig = {
     apiKey: "AIzaSyADgIdomw9VmyRWyDJrB5kIGwLXke0FSAo",
@@ -12,7 +17,25 @@ const firebaseConfig = {
     measurementId: "G-WLH41TME67"
 };
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+// 1. Patrón Singleton para la App (Evita reinicializar si ya existe)
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+
+// 2. Inicialización Segura de Firestore
+let db;
+try {
+    // Intentamos activar la caché persistente (Ahorro de datos)
+    db = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+            tabManager: persistentMultipleTabManager() 
+        })
+    });
+} catch (e) {
+    // Si falla porque "ya estaba inicializada" (Hot Reload), usamos la existente
+    // Esto silencia el error rojo y permite que la app siga funcionando
+    db = getFirestore(app);
+}
+
+// 3. Inicializar Auth
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+export { db };

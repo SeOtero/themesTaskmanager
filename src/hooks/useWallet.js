@@ -1,68 +1,77 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getWalletBalance, saveWalletBalance } from '../services/wallet.service';
 
 export const useWallet = (user) => {
-    // Estado local para la UI (para que se vea rápido)
     const [balance, setBalance] = useState(0);
     const [loading, setLoading] = useState(true);
+    
+    // Ref para el debounce (evita guardar en cada click)
+    const timeoutRef = useRef(null);
+    const pendingBalanceRef = useRef(null); // Guarda el saldo pendiente de escritura
 
-    // useEffect: Se ejecuta cuando cambia el 'user'
+    // 1. Carga inicial
     useEffect(() => {
         if (!user?.uid) return;
-
         const loadData = async () => {
             try {
                 setLoading(true);
                 const serverBalance = await getWalletBalance(user.uid);
                 setBalance(serverBalance);
+                pendingBalanceRef.current = serverBalance; // Sincronizamos
             } catch (error) {
                 console.error("Falló la carga de billetera");
             } finally {
                 setLoading(false);
             }
         };
-
         loadData();
     }, [user]);
 
-    // Función para actualizar el saldo
-    // Usamos 'useCallback' para optimizar rendimiento (evita que la función se recree en cada render)
-    const updateBalance = useCallback(async (newAmount) => {
+    // 2. Función de actualización con DEBOUNCE
+    const updateBalance = useCallback((newAmount) => {
         if (!user?.uid) return;
 
-        // 1. Optimistic UI: Actualizamos la pantalla INMEDIATAMENTE
-        // El usuario siente que la app vuela, aunque Firebase tarde 200ms
+        // A. Optimistic UI: Actualizamos pantalla YA
         setBalance(newAmount);
+        pendingBalanceRef.current = newAmount;
 
-        try {
-            // 2. Background: Guardamos en Firebase
-            await saveWalletBalance(user.uid, newAmount);
-        } catch (error) {
-            // Si falla, revertimos el cambio visual (Rollback)
-            console.error("Error guardando, revirtiendo UI...");
-            // Aquí podríamos volver a cargar el saldo real
-            const real = await getWalletBalance(user.uid);
-            setBalance(real);
+        // B. Cancelamos guardado anterior si existe
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
         }
+
+        // C. Programamos nuevo guardado en 2 segundos
+        timeoutRef.current = setTimeout(async () => {
+            try {
+                // Guardamos el ÚLTIMO valor conocido
+                const finalAmount = pendingBalanceRef.current;
+                await saveWalletBalance(user.uid, finalAmount);
+                console.log("💰 Saldo guardado en Firebase:", finalAmount);
+            } catch (error) {
+                console.error("Error guardando saldo, revertimos...");
+                // Si falla, recargamos el real
+                const real = await getWalletBalance(user.uid);
+                setBalance(real);
+            }
+        }, 2000); // 2 segundos de espera
+
     }, [user]);
 
-    // Helpers "sugar syntax" para hacerle la vida fácil a App.jsx
     const addCoins = (amount) => updateBalance(balance + amount);
     
     const spendCoins = (amount) => {
         if (balance >= amount) {
             updateBalance(balance - amount);
-            return true; // Compra exitosa
+            return true; 
         }
-        return false; // Fondos insuficientes
+        return false; 
     };
 
-    // Retornamos el "Contrato": Lo único que App.jsx necesita saber
     return {
-        balance,       // El número (ej: 1500)
-        loading,       // Booleano (true/false)
-        updateBalance, // Función genérica
-        addCoins,      // Función helper
-        spendCoins     // Función helper
+        balance,       
+        loading,      
+        updateBalance, 
+        addCoins,      
+        spendCoins     
     };
 };
