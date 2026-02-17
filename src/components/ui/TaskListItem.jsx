@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { formatTime } from '../../utils/helpers';
 import { shopOptions } from '../../data/constants';
 
@@ -16,59 +16,66 @@ const TaskListItem = ({ task, toggleTimer, deleteTask, updateTaskDetails, themeC
     const [isEditingName, setIsEditingName] = useState(false); 
     const [editedName, setEditedName] = useState(task.rawTaskName);
     
+    // Estados de confirmación
     const [isConfirmingReset, setIsConfirmingReset] = useState(false);
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-    
-    // Cálculo del tiempo actual
-    const currentElapsedTime = task.running 
-        ? task.elapsedTime + (Date.now() - (task.lastTime || Date.now())) 
-        : task.elapsedTime;
-        
+
+    // --- CORRECCIÓN CLAVE ---
+    // No calculamos el tiempo aquí. Confiamos 100% en 'task.elapsedTime' que ya viene calculado "en vivo" desde useTasks.js
+    // Esto evita desincronizaciones y "saltos" de tiempo.
+    const displayTime = formatTime(task.elapsedTime);
+
+    // Sincronizar el input de edición solo al abrir el modo edición
+    useEffect(() => {
+        if (isEditingTime) {
+            setEditedTime(displayTime);
+        }
+    }, [isEditingTime]); // Quitamos displayTime de dep, solo actualizamos al abrir
+
     const isCustomTask = task.isCustom; 
 
-    // Sincronizar el tiempo editado con el tiempo real cuando no se está editando
-    useEffect(() => {
-        if (!isEditingTime) {
-            setEditedTime(formatTime(currentElapsedTime));
-        }
-    }, [currentElapsedTime, isEditingTime]);
+    // --- HANDLERS ---
 
-    // --- HANDLERS DE EDICIÓN ---
-
-    // 1. Editar Tiempo (HH:MM:SS -> Milisegundos)
     const handleTimeEdit = () => { 
         const parts = editedTime.split(':').map(Number); 
         if (parts.length === 3 && !parts.some(isNaN)) { 
             const totalMs = (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000; 
-            updateTaskDetails(task.id, { elapsedTime: totalMs, lastTime: task.running ? Date.now() : null }); 
+            // Al guardar manual, si está corriendo, reseteamos el lastTime para evitar saltos
+            updateTaskDetails(task.id, { 
+                elapsedTime: totalMs, 
+                lastTime: task.running ? Date.now() : null 
+            }); 
         } 
         setIsEditingTime(false); 
     };
 
-    // 2. Editar Cantidad (Input Manual)
     const handleQuantityEdit = () => { 
         updateTaskDetails(task.id, { quantity: parseInt(editedQuantity) || 0 }); 
         setIsEditingQuantity(false); 
     };
 
-    // 3. Editar Tienda
     const handleShopEdit = () => { 
         if (editedShop) updateTaskDetails(task.id, { shop: editedShop }); 
         setIsEditingShop(false); 
     };
 
-    // 4. Editar Nombre
     const handleNameEdit = () => { 
         const nameToUpdate = editedName.trim() || 'Tarea sin Nombre'; 
         updateTaskDetails(task.id, { rawTaskName: nameToUpdate }); 
         setIsEditingName(false); 
     };
 
-    // 5. Acciones de Botones
-    const handleResetClick = () => { resetTaskTimer(task.id); setIsConfirmingReset(false); };
-    const handleDeleteConfirm = () => { deleteTask(task.id); setIsConfirmingDelete(false); };
+    const handleResetClick = () => { 
+        resetTaskTimer(task.id); 
+        setIsConfirmingReset(false); 
+    };
+    
+    const handleDeleteConfirm = () => { 
+        deleteTask(task.id); 
+        setIsConfirmingDelete(false); 
+    };
 
-    // --- ESTILOS DINÁMICOS ---
+    // --- ESTILOS ---
     const runningBorderClass = task.running 
         ? (celebrationThemeName === 'biancaBday' ? 'border-l-4 border-pink-400' : 'border-l-4 border-green-500') 
         : 'border-l-4 border-gray-600';
@@ -80,10 +87,9 @@ const TaskListItem = ({ task, toggleTimer, deleteTask, updateTaskDetails, themeC
     return (
         <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 sm:gap-4 sm:p-4 rounded-xl shadow-md transition-all duration-300 ${themeClasses.itemBg} ${runningBorderClass}`}>
             
-            {/* --- SECCIÓN IZQUIERDA: DATOS DE LA TAREA --- */}
+            {/* IZQUIERDA: DATOS */}
             <div className="flex flex-col gap-1 min-w-0 flex-grow">
-                
-                {/* 1. Tienda */}
+                {/* Tienda */}
                 {isEditingShop ? (
                     <select 
                         value={editedShop} 
@@ -98,13 +104,12 @@ const TaskListItem = ({ task, toggleTimer, deleteTask, updateTaskDetails, themeC
                     <span 
                         className={`font-bold text-xs sm:text-sm uppercase tracking-wider opacity-80 cursor-pointer hover:text-white transition-colors ${themeClasses.accentText}`} 
                         onClick={() => { setEditedShop(task.shop); setIsEditingShop(true); }}
-                        title="Clic para cambiar tienda"
                     >
                         {task.shop || 'Sin Tienda'}
                     </span> 
                 )}
                 
-                {/* 2. Nombre de Tarea */}
+                {/* Nombre */}
                 {isEditingName && isCustomTask ? (
                     <input 
                         type="text" 
@@ -124,7 +129,7 @@ const TaskListItem = ({ task, toggleTimer, deleteTask, updateTaskDetails, themeC
                     </span> 
                 )}
                 
-                {/* 3. CANTIDAD + BOTÓN +1 (CRUCIAL PARA LA VELOCIDAD) */}
+                {/* Cantidad */}
                 <div className="flex items-center gap-3 mt-1">
                     {isEditingQuantity ? (
                         <div className="flex items-center gap-1">
@@ -144,31 +149,24 @@ const TaskListItem = ({ task, toggleTimer, deleteTask, updateTaskDetails, themeC
                             <span 
                                 className={`font-mono text-sm sm:text-base cursor-pointer hover:text-white transition-colors ${themeClasses.secondaryText}`} 
                                 onClick={() => { setEditedQuantity(task.quantity || ''); setIsEditingQuantity(true); }}
-                                title="Clic para editar cantidad manualmente"
                             >
                                 {task.quantity ? `${task.quantity} órdenes` : '0 órdenes'}
                             </span> 
-                            
-                            {/* BOTÓN +1 */}
                             <button 
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     updateTaskDetails(task.id, { quantity: (task.quantity || 0) + 1 });
                                 }} 
                                 className={`text-[10px] font-bold px-2 py-0.5 rounded shadow-sm transition-transform active:scale-95 ${buttonIncrementClass}`}
-                                title="Sumar 1 orden"
-                            > 
-                                +1 
-                            </button> 
+                            > +1 </button> 
                         </div> 
                     )}
                 </div>
             </div>
 
-            {/* --- SECCIÓN DERECHA: TIEMPO Y CONTROLES --- */}
+            {/* DERECHA: TIEMPO */}
             <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 w-full sm:w-auto flex-shrink-0 pt-2 sm:pt-0 border-t border-gray-700/30 sm:border-none mt-2 sm:mt-0">
                 
-                {/* 4. TIEMPO EDITABLE */}
                 {isEditingTime ? ( 
                     <input 
                         type="text" 
@@ -176,26 +174,22 @@ const TaskListItem = ({ task, toggleTimer, deleteTask, updateTaskDetails, themeC
                         onChange={(e) => setEditedTime(e.target.value)} 
                         onBlur={handleTimeEdit} 
                         onKeyPress={(e) => e.key === 'Enter' && handleTimeEdit()} 
-                        placeholder="HH:MM:SS" 
                         className={`font-mono text-xl sm:text-2xl border-b-2 bg-gray-900 focus:outline-none w-28 sm:w-32 text-center rounded ${themeClasses.primaryText} border-blue-500 tracking-widest`} 
                         autoFocus 
                     /> 
                 ) : ( 
                     <span 
                         className={`font-mono text-xl sm:text-2xl cursor-pointer hover:scale-105 transition-transform tracking-widest ${task.running ? 'text-green-400 font-bold' : themeClasses.primaryText}`} 
-                        onClick={() => { setEditedTime(formatTime(currentElapsedTime)); setIsEditingTime(true); }}
-                        title="Clic para editar tiempo manualmente"
+                        onClick={() => { setIsEditingTime(true); }}
                     >
-                        {formatTime(currentElapsedTime)}
+                        {displayTime}
                     </span> 
                 )}
                 
                 <div className="flex items-center gap-2 sm:gap-3">
-                    {/* Play/Pause */}
                     <button 
                         onClick={() => toggleTimer(task.id)} 
                         className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white font-bold transition-all shadow-lg active:scale-95 ${task.running ? 'bg-red-500 hover:bg-red-600 animate-pulse' : 'bg-green-600 hover:bg-green-500'}`}
-                        title={task.running ? 'Pausar' : 'Iniciar'}
                     >
                         {task.running ? (
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
@@ -204,20 +198,19 @@ const TaskListItem = ({ task, toggleTimer, deleteTask, updateTaskDetails, themeC
                         )}
                     </button>
 
-                    {/* Reset y Delete */}
                     <div className="flex flex-col gap-1">
                         {isConfirmingReset ? ( 
-                            <button onClick={handleResetClick} className="text-red-500 hover:text-red-400 text-xs font-bold bg-red-900/30 px-2 py-1 rounded" title="Confirmar Reset">Conf?</button>
+                            <button onClick={handleResetClick} className="text-red-500 hover:text-red-400 text-xs font-bold bg-red-900/30 px-2 py-1 rounded">Conf?</button>
                         ) : ( 
-                            <button onClick={() => { setIsConfirmingReset(true); setIsConfirmingDelete(false); }} className="text-gray-500 hover:text-gray-300 transition" title="Reiniciar">
+                            <button onClick={() => { setIsConfirmingReset(true); setIsConfirmingDelete(false); }} className="text-gray-500 hover:text-gray-300 transition">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m-15.357-2A8.001 8.001 0 0019.418 15m0 0H15" /></svg>
                             </button> 
                         )}
                         
                         {isConfirmingDelete ? (
-                            <button onClick={handleDeleteConfirm} className="text-red-500 hover:text-red-400 text-xs font-bold bg-red-900/30 px-2 py-1 rounded" title="Confirmar Eliminar">Borrar?</button>
+                            <button onClick={handleDeleteConfirm} className="text-red-500 hover:text-red-400 text-xs font-bold bg-red-900/30 px-2 py-1 rounded">Borrar?</button>
                         ) : (
-                            <button onClick={() => { setIsConfirmingDelete(true); setIsConfirmingReset(false); }} className="text-gray-500 hover:text-red-500 transition" title="Eliminar">
+                            <button onClick={() => { setIsConfirmingDelete(true); setIsConfirmingReset(false); }} className="text-gray-500 hover:text-red-500 transition">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                             </button>
                         )}
