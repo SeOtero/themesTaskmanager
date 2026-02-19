@@ -19,7 +19,7 @@ import { getTodayID, getCurrentWeekID } from './utils/helpers';
 
 // --- FIREBASE (Importamos limit para ahorrar lecturas) ---
 import { doc, getDoc, updateDoc, collection, addDoc, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore'; 
-import { db } from './firebase'; // ⚠️ Asegúrate que este nombre coincida con tu archivo (firebase.js o config.js)
+import { db } from './firebase'; 
 
 // --- COMPONENTS ---
 import TeamLeaderView from './components/dashboard/TeamLeaderView'; 
@@ -38,7 +38,6 @@ import FloatingActions from './components/ui/FloatingActions';
 import QuickNotesWidget from './components/tools/QuickNotesWidget';
 
 // --- MODALES CON LAZY LOADING (AHORRO DE MEMORIA) ---
-// Estos componentes no se descargarán hasta que el usuario haga click
 const SalaryCalculatorModal = lazy(() => import('./components/modals/SalaryCalculatorModal'));
 const IdeasModal = lazy(() => import('./components/modals/IdeasModal'));
 const MarketplaceModal = lazy(() => import('./components/modals/MarketplaceModal'));
@@ -50,8 +49,7 @@ import ReportConfigModal from './components/modals/ReportConfigModal';
 import DeleteAllConfirmationModal from './components/modals/DeleteAllConfirmationModal';
 
 // --- EFFECTS ---
-import { EFFECT_COMPONENTS, SpiderWeb } from './components/effects/BackgroundEffects';
-import MatrixEffect from './components/effects/MatrixEffect';
+import { SpiderWeb } from './components/effects/BackgroundEffects';
 import BackgroundEffectsManager from './components/effects/BackgroundEffectManager';
 
 
@@ -63,15 +61,38 @@ const App = () => {
     const [userProfile, setUserProfile] = useState(null);
     const [showDashboard, setShowDashboard] = useState(false); 
 
-    useEffect(() => {
+   useEffect(() => {
         if (user) {
             const fetchRole = async () => {
                 try {
                     const docRef = doc(db, "users", user.uid);
                     const docSnap = await getDoc(docRef);
-                    if (docSnap.exists()) setUserProfile(docSnap.data());
-                    else setUserProfile({ role: 'agent', team: 'default' });
-                } catch (e) { console.error("Error fetching user role", e); }
+                    
+                    if (docSnap.exists()) {
+                        // Si existe, cargamos su perfil
+                        setUserProfile(docSnap.data());
+                    } else {
+                        // 🚨 AQUÍ ESTÁ LA MAGIA: SI NO EXISTE, LO CREAMOS 🚨
+                        const newProfile = { 
+                            uid: user.uid,
+                            email: user.email,
+                            // Si no tiene nombre (por ser email/pass), usamos la primera parte del mail
+                            userName: user.displayName || user.email.split('@')[0], 
+                            role: 'agent', 
+                            team: 'default',
+                            createdAt: Date.now(),
+                            photoURL: user.photoURL || null
+                        };
+                        
+                        // Guardamos en Firebase para que el Team Leader lo vea
+                        await setDoc(docRef, newProfile); // Necesitas importar setDoc arriba
+                        
+                        setUserProfile(newProfile);
+                        console.log("Perfil de usuario fantasma creado automáticamente.");
+                    }
+                } catch (e) { 
+                    console.error("Error fetching/creating user role", e); 
+                }
             };
             fetchRole();
         }
@@ -101,6 +122,9 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
     const [hourlyRate, setHourlyRate] = useFirestoreDoc('config', 'hourlyRate', '', shouldLoadData ? user : null);
     const [weeklyGoal, setWeeklyGoal] = useFirestoreDoc('config', 'weeklyGoal', 10, shouldLoadData ? user : null);
     const [inventory, setInventory] = useFirestoreDoc('data', 'inventory', ['default'], shouldLoadData ? user : null);
+    
+    // NOTA: Fragments y LootBoxes eliminados a petición.
+
     const [lastBonusDate, setLastBonusDate, loadingBonus] = useFirestoreDoc('data', 'lastLoginBonus', null, shouldLoadData ? user : null);
     const [lastBonusWeek, setLastBonusWeek] = useFirestoreDoc('data', 'lastWeeklyBonus', '', shouldLoadData ? user : null);
 
@@ -114,6 +138,16 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
     const [selectedReportDate, setSelectedReportDate] = useState(getTodayID());
     const [pastReports, setPastReports] = useState([]); 
     const [manualTheme, setManualTheme] = useState(null);
+    // 🔥 NUEVO: Restaurar el tema guardado del usuario al cargar la app 🔥
+    const hasLoadedSkin = useRef(false);
+    useEffect(() => {
+        if (userProfile && !hasLoadedSkin.current) {
+            if (userProfile.currentSkin) {
+                setManualTheme(userProfile.currentSkin);
+            }
+            hasLoadedSkin.current = true;
+        }
+    }, [userProfile]);
 
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [isSalaryModalOpen, setIsSalaryModalOpen] = useState(false);
@@ -148,7 +182,7 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
         clearStatusMessage, 
         syncTasksTime, 
         errorMessage, 
-        setErrorMessage,
+        setErrorMessage, 
         distributeTasksTime,
         sortTasksByShop,
     } = taskData;
@@ -163,97 +197,52 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
     useEffect(() => {
         if (!user) return;
 
-        // 1. Cargar Noticias (Solo las últimas 5)
         const newsQuery = query(collection(db, "news_ticker"), orderBy("createdAt", "desc"), limit(5));
         const newsUnsub = onSnapshot(newsQuery, (snap) => setNews(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
         
-        // 2. Cargar Quizzes
         const quizUnsub = onSnapshot(query(collection(db, "training_modules"), where("active", "==", true)), (snap) => setQuizzes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
         
-        // 3. Cargar Progreso
         const progressUnsub = onSnapshot(doc(db, "users", user.uid), (docSnap) => {
             if (docSnap.exists()) {
                 setUserQuizProgress(docSnap.data().quizProgress || {});
             }
         });
         
-        // 4. 🔥 CARGAR REPORTES (LIMITADO A 45 DÍAS + RECONSTRUCCIÓN) 🔥
-        const reportsQuery = query(
-            collection(db, "daily_reports"), 
-            where("uid", "==", user.uid),
-            orderBy("date", "desc"), // Orden descendente (nuevos primero)
-            limit(45) // Límite estricto de lectura
-        );
-
+        const reportsQuery = query(collection(db, "daily_reports"), where("uid", "==", user.uid), orderBy("date", "desc"), limit(45));
         const reportsUnsub = onSnapshot(reportsQuery, (snap) => {
             const loadedReports = snap.docs.map(doc => {
                 const data = doc.data();
-                
-                // A. Recuperar Fecha
                 let finalDate = data.date;
-                if (!finalDate && doc.id.includes('_')) {
-                    const match = doc.id.match(/(\d{4}-\d{2}-\d{2})/);
-                    if (match) finalDate = match[0];
-                }
-                if (!finalDate && data.timestamp) {
-                    finalDate = new Date(data.timestamp).toLocaleDateString('en-CA');
-                }
+                if (!finalDate && doc.id.includes('_')) { const match = doc.id.match(/(\d{4}-\d{2}-\d{2})/); if (match) finalDate = match[0]; }
+                if (!finalDate && data.timestamp) { finalDate = new Date(data.timestamp).toLocaleDateString('en-CA'); }
                 if (!finalDate) return null;
-
-                // B. Recuperar o Reconstruir Contenido
                 let content = data.report || data.content || data.text || data.body;
-                
                 if (!content && data.taskBreakdown) {
                     const tasks = Array.isArray(data.taskBreakdown) ? data.taskBreakdown : [];
-                    const formatMs = (ms) => {
-                        if (!ms || isNaN(ms)) return "00:00:00";
-                        const s = Math.floor((ms / 1000) % 60);
-                        const m = Math.floor((ms / (1000 * 60)) % 60);
-                        const h = Math.floor((ms / (1000 * 60 * 60)));
-                        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-                    };
+                    const formatMs = (ms) => { if (!ms || isNaN(ms)) return "00:00:00"; const s = Math.floor((ms / 1000) % 60); const m = Math.floor((ms / (1000 * 60)) % 60); const h = Math.floor((ms / (1000 * 60 * 60))); return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`; };
                     const totalMs = tasks.reduce((acc, t) => acc + (t.elapsedTime || 0), 0);
-                    
-                    content = `📊 REPORTE RECUPERADO (${finalDate})\n\n` +
-                              `⏱️ Tiempo Total Real: ${formatMs(totalMs)}\n` +
-                              `✅ Tareas Realizadas: ${tasks.length}\n` +
-                              `-----------------------------------\n`;
-                    
-                    if (tasks.length > 0) {
-                        content += tasks.map(t => {
-                            const name = t.name || t.text || t.taskName || "Tarea sin nombre";
-                            const time = t.timeFormatted || formatMs(t.elapsedTime);
-                            return `• ${name} (${time})`;
-                        }).join('\n');
-                    } else content += "Sin detalles.";
+                    content = `📊 REPORTE RECUPERADO (${finalDate})\n\n⏱️ Tiempo Total Real: ${formatMs(totalMs)}\n✅ Tareas Realizadas: ${tasks.length}\n-----------------------------------\n`;
+                    if (tasks.length > 0) { content += tasks.map(t => `• ${t.name || t.text || "Tarea"} (${t.timeFormatted || formatMs(t.elapsedTime)})`).join('\n'); } else content += "Sin detalles.";
                 }
-
                 return { id: finalDate, content: content || "Datos ilegibles" };
             }).filter(Boolean);
-
             setPastReports(loadedReports);
-        }, (error) => {
-            console.warn("⚠️ Firebase requiere un índice. Haz clic en el enlace de la consola:", error);
-        });
+        }, (error) => console.warn("Index warning:", error));
 
-        // Limpieza
         return () => { newsUnsub(); quizUnsub(); progressUnsub(); reportsUnsub(); };
-
     }, [user]); 
-
 
     // --- EFECTO 2: GUARDAR SKIN (CON DEBOUNCE) ---
     useEffect(() => {
         if (user && themeClasses.name) {
             const timeoutId = setTimeout(() => {
-                updateDoc(doc(db, "users", user.uid), { currentSkin: themeClasses.name })
-                    .catch((e) => console.log("Skin sync skip", e));
+                updateDoc(doc(db, "users", user.uid), { currentSkin: themeClasses.name }).catch((e) => console.log("Skin sync skip", e));
             }, 2000);
             return () => clearTimeout(timeoutId);
         }
     }, [themeClasses.name, user]);
 
-    
+    // --- CÁLCULO DE GRADUACIÓN ---
     const graduationStatus = useMemo(() => {
         if (quizzes.length === 0) return { isGraduated: false, isRusted: false };
         let passedCount = 0;
@@ -319,13 +308,23 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
 
     const handleCloseShop = () => setIsMarketModalOpen(false);
 
+    // --- FUNCIÓN DE COMPRA CLÁSICA (Sin Fragmentos) ---
     const handleBuyItem = (item) => { 
         if (spendCoins(item.price)) { 
             const newInventory = [...(inventory || []), item.id];
             setInventory(newInventory); 
+            
+            // Guardamos en Firebase (Fire & Forget)
+            updateDoc(doc(db, "users", user.uid), { 
+                walletBalance: lofiCoins - item.price,
+                inventory: newInventory 
+            }).catch(e => console.error(e));
+
             logEvent("SHOP_BUY", { item: item.id });
-            alert("¡Compra realizada!");
-        } else { alert("No tienes suficientes Lofi Coins."); } 
+            alert("¡Item adquirido correctamente!");
+        } else { 
+            alert("No tienes suficientes Lofi Coins."); 
+        } 
     };
 
     const previewTimerRef = useRef(null); 
@@ -382,14 +381,10 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
     }, [activeBorder]);
 
     const cardGlowClass = themeClasses.name === 'halloween' ? 'glow-card' : '';
-
-    const selectedReportContent = useMemo(() => { 
-        const found = pastReports.find(r => r.id === calendarSelectedDate); 
-        return found ? found.content : null; 
-    }, [pastReports, calendarSelectedDate]);
+    const selectedReportContent = useMemo(() => { const found = pastReports.find(r => r.id === calendarSelectedDate); return found ? found.content : null; }, [pastReports, calendarSelectedDate]);
 
     /* ==================================================================================
-       SECCIÓN 4: RENDERIZADO (CON SUSPENSE PARA AHORRO DE MEMORIA)
+       SECCIÓN 4: RENDERIZADO
        ================================================================================== */
     return (
         <>
@@ -412,7 +407,6 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
                 setIdeaType={setIdeaType}
             />
 
-            {/* 🔥 SUSPENSE WRAPPER: Solo carga lo que se usa 🔥 */}
             <Suspense fallback={<div className="fixed inset-0 z-[200] pointer-events-none" />}>
                 <IdeasModal isOpen={isIdeasModalOpen} onClose={() => setIsIdeasModalOpen(false)} user={user} userProfile={userProfile} initialType={ideaType} />
                 <AvailabilityModal isOpen={isAvailabilityModalOpen} onClose={() => setIsAvailabilityModalOpen(false)} user={user} userProfile={userProfile} addCoins={addCoins} logEvent={logEvent} />
@@ -425,11 +419,25 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
                 
                 <SalaryCalculatorModal isOpen={isSalaryModalOpen} onClose={() => setIsSalaryModalOpen(false)} pastReports={pastReports} hourlyRate={hourlyRate} setHourlyRate={setHourlyRate} themeClasses={themeClasses} />
                 
-                <MarketplaceModal isOpen={isMarketModalOpen} onClose={handleCloseShop} userCoins={lofiCoins} ownedItems={inventory} currentTheme={themeClasses.name} activePet={activePet} activeBorder={activeBorder} activeEffect={activeEffect} onBuy={handleBuyItem} onEquip={applyItemChange} onPreview={handlePreviewItem} />
+                <MarketplaceModal 
+                    isOpen={isMarketModalOpen} 
+                    onClose={handleCloseShop} 
+                    userCoins={lofiCoins} 
+                    ownedItems={inventory} 
+                    currentTheme={themeClasses.name} 
+                    activePet={activePet} 
+                    activeBorder={activeBorder} 
+                    activeEffect={activeEffect} 
+                    onBuy={handleBuyItem} 
+                    onEquip={applyItemChange} 
+                    onPreview={handlePreviewItem} 
+                />
             </Suspense>
 
-            {/* 🔥 WIDGET DE NOTAS 🔥 */}
-            <QuickNotesWidget user={user} />
+            {/* 🔥 WIDGET DE NOTAS (ASEGURADO CON Z-INDEX) 🔥 */}
+            <div className="relative z-50">
+                <QuickNotesWidget user={user} />
+            </div>
 
             <BackgroundEffectsManager themeClasses={themeClasses} activeEffect={activeEffect} />
             <GlobalStatusMessage message={statusMessage} resumeAction={resumeStoppedTimers} dismissAction={clearStatusMessage} />
@@ -460,7 +468,6 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
                 themeClasses={themeClasses} 
             />
 
-            {/* --- CONTENEDOR PRINCIPAL --- */}
             <div className="app-container relative z-10 flex flex-col items-center justify-center py-10 mt-8">
                 <div className="relative w-11/12 max-w-xl mt-8">
                    <div className={`w-full rounded-2xl shadow-2xl p-4 sm:p-8 pt-8 sm:pt-12 transition-all duration-500 ${themeClasses.cardBg} min-h-[85vh] relative ${cardGlowClass} ${getBorderClass()} app-card`}>
@@ -469,7 +476,6 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
                         <div className="relative z-20 space-y-6 h-full flex flex-col">
                             <Title themeClasses={themeClasses} celebrationMessage={message} />
                             
-                            {/* Widgets de Quiz */}
                             {quizzes.length > 0 && (
                                 <div className="flex gap-2 overflow-x-auto pb-2">
                                     {quizzes.map(q => {
@@ -497,7 +503,6 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
                                 <div className="flex-1 flex flex-col gap-4 animate-fadeIn">
                                     <TaskInputForm addTask={addTask} addMultipleTasks={addMultipleTasks} errorMessage={errorMessage} setErrorMessage={setErrorMessage} themeClasses={themeClasses} />
                                     
-                                    {/* Botones de control de lista */}
                                     {tasks.length > 0 && (
                                         <div className="flex items-center justify-between gap-3 px-1 mb-1 animate-fadeIn">
                                             <button onClick={sortTasksByShop} className="px-4 py-2 bg-slate-700/50 hover:bg-slate-600 text-slate-300 text-xs font-bold uppercase tracking-wider rounded-full border border-slate-600 hover:border-slate-400 transition-all shadow-sm active:scale-95 flex items-center gap-2"><span>🏷️</span> Ordenar por Tienda</button>
