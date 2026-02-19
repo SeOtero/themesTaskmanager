@@ -9,6 +9,7 @@ import ForestFlora from './ForestFlora';
 import GoldenDust from './GoldenDust';
 import ShootingStars from './ShootingStars';
 import SnowEffect from './SnowEffect';
+import Lanterns from './Lanterns';
 import { BackgroundAudio, BackgroundRain } from './BackgroundEffects';
 
 // --- IMPORTS DE EFECTOS DE TEMPORADA ---
@@ -48,6 +49,7 @@ const BackgroundEffectsManager = ({ themeClasses, activeEffect }) => {
         // Efectos recuperados para tus temas (Lofi, Forest, etc.)
         'lofi_notes': LofiNotes,
         'cozy_lights': CozyLights,
+        'lanterns': Lanterns,
         'mystic_fog': MysticFog,
         'forest': ForestFlora,      // Asumo que en themes.js se llama 'forest' o 'forest_flora'
         'forest_flora': ForestFlora, // Pongo ambos por seguridad

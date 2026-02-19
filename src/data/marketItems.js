@@ -8,6 +8,30 @@ export const MARKET_ITEMS = [
     { id: 'neko', name: 'Concepto: Neko Tokyo', description: 'Estilo Cartoon Pop felino.', price: 600, category: 'theme', icon: '😸' },
     { id: 'neon', name: 'Concepto: Neon City', description: 'Cyberpunk lluvioso.', price: 650, category: 'theme', icon: '🌃' },
     { id: 'royal', name: 'Concepto: Royal Treasury', description: 'Oro puro. Lujo extremo.', price: 2000, category: 'theme', icon: '👑' },
+    { 
+        id: 'beach', 
+        name: 'Lanterns: Fuego', 
+        description: 'Pasión carmesí y linternas cálidas.', 
+        price: 1200, 
+        category: 'theme', 
+        icon: '🔥' 
+    },
+    { 
+        id: 'beach_night', 
+        name: 'Lanterns: Místico', 
+        description: 'Magia nocturna y luces violetas.', 
+        price: 1200, 
+        category: 'theme', 
+        icon: '🔮' 
+    },
+    { 
+        id: 'beach_spirit', 
+        name: 'Lanterns: Zen', 
+        description: 'Paz natural y orbes espirituales.', 
+        price: 1200, 
+        category: 'theme', 
+        icon: '🍃' 
+    },
     { id: 'galaxy', name: 'Concepto: Cosmic Voyager', description: 'Viaje interestelar.', price: 1500, category: 'theme', icon: '🌌' },
 
     // --- MARCOS (BORDERS) ---
@@ -35,6 +59,7 @@ export const MARKET_ITEMS = [
     // --- EFECTOS ---
     // ✅ NUEVO: Sin Efecto (Gratis)
     { id: 'effect_none', name: 'Sin Efecto', description: 'Desactiva las partículas.', price: 0, category: 'effect', icon: '🚫' },
+    
 
     // Tier 1.5
     { id: 'rain', name: 'Lluvia', description: 'Capa de lluvia suave.', price: 100, category: 'effect', icon: '🌧️' },
@@ -44,6 +69,7 @@ export const MARKET_ITEMS = [
     { id: 'lofi_notes', name: 'Notas Musicales', description: 'Melodía visual flotante.', price: 300, category: 'effect', icon: '🎵' },
     { id: 'forest_flora', name: 'Bosque Vivo', description: 'Luciérnagas y hojas cayendo.', price: 350, category: 'effect', icon: '🍃' },
     { id: 'cozy_lights', name: 'Luces Cozy', description: 'Orbes cálidos y mágicos.', price: 400, category: 'effect', icon: '💡' },
+    { id: 'lanterns', name: 'Linternas Flotantes', description: 'Luces cálidas subiendo al cielo.', price: 450, category: 'effect', icon: '🏮' },
     
     // Tier 3
     { id: 'mystic_fog', name: 'Niebla Mística', description: 'Bruma densa y misteriosa.', price: 600, category: 'effect', icon: '🌫️' },

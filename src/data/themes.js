@@ -267,6 +267,103 @@ export const THEMES = {
         modalBg: 'bg-gray-900 border-green-800',
         activeEffects: ['mystic_fog', 'forest_flora'] 
     },
+   // VARIANT A: La Original (Cálida)
+    beach: {
+        name: 'Lanterns: Fuego',
+        emoji: '🔥',
+        price: 1200,
+        category: 'theme',
+        description: 'Atardecer carmesí. Pasión y calidez.',
+        rawBg: 'linear-gradient(180deg, #240b0b 0%, #751010 40%, #d94f04 70%, #ffca28 100%)',
+        cardBg: 'bg-[#3b0a0a]/60 backdrop-blur-md border border-orange-500/30 shadow-[0_0_40px_rgba(255,69,0,0.3)]',
+        primaryText: 'text-orange-50 font-bold', 
+        secondaryText: 'text-orange-200', 
+        accentText: 'text-yellow-400',
+        itemBg: 'bg-red-950/40 hover:bg-red-900/60 border-l-2 border-orange-500',
+        buttonAction: 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white',
+        borderClass: 'border-l-4 border-orange-500',
+        activeEffects: ['lanterns'], 
+        customCss: `
+            @keyframes warm-breeze { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+            body { background-size: 200% 200% !important; animation: warm-breeze 25s ease-in-out infinite; }
+            ::-webkit-scrollbar-thumb { background: #ffca28; }
+        `
+    },
+
+    // VARIANT B: Noche Mágica (Azul/Violeta)
+    beach_night: {
+        name: 'Lanterns: Místico',
+        emoji: '🔮',
+        price: 1200,
+        category: 'theme',
+        description: 'Noche profunda y magia arcana.',
+        // Degradado Azul Noche -> Violeta -> Magenta oscuro
+        rawBg: 'linear-gradient(180deg, #020024 0%, #090979 40%, #2a004e 100%)',
+        cardBg: 'bg-[#1a0b2e]/60 backdrop-blur-md border border-purple-500/30 shadow-[0_0_40px_rgba(147,51,234,0.3)]',
+        primaryText: 'text-purple-100 font-bold', 
+        secondaryText: 'text-indigo-200', 
+        accentText: 'text-pink-400',
+        itemBg: 'bg-indigo-950/40 hover:bg-indigo-900/60 border-l-2 border-purple-500',
+        buttonAction: 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white',
+        borderClass: 'border-l-4 border-purple-500',
+        activeEffects: ['lanterns'], 
+        customCss: `
+            @keyframes night-breeze { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+            body { background-size: 200% 200% !important; animation: night-breeze 25s ease-in-out infinite; }
+            ::-webkit-scrollbar-thumb { background: #d8b4fe; }
+            
+            /* TRUCO: Cambiamos el color de las linternas rojas a rosadas/violetas con un filtro */
+            .lantern-item { filter: hue-rotate(280deg) drop-shadow(0 0 10px #d8b4fe) !important; }
+        `
+    },
+
+   // VARIANT C: Espíritu del Bosque (Zen) - MEJORADO
+    beach_spirit: {
+        name: 'Lanterns: Zen',
+        emoji: '🍃',
+        price: 1200,
+        category: 'theme',
+        description: 'Bosque sagrado. Luces fatuas y serenidad.',
+        
+        // --- FONDO MEJORADO ---
+        // Degradado más complejo: Negro Bosque -> Verde Pino Profundo -> Verde Azulado Místico
+        rawBg: 'linear-gradient(180deg, #011810 0%, #064e3b 40%, #115e59 70%, #0f393b 100%)',
+        
+        // --- TARJETA ---
+        cardBg: 'bg-[#062c1b]/70 backdrop-blur-md border border-emerald-500/30 shadow-[0_0_50px_rgba(16,185,129,0.2)]',
+        
+        primaryText: 'text-emerald-50 font-medium tracking-widest', 
+        secondaryText: 'text-emerald-200/80', 
+        accentText: 'text-teal-300 drop-shadow-[0_0_8px_rgba(45,212,191,0.8)]', // Texto brillante
+        
+        itemBg: 'bg-emerald-950/50 hover:bg-emerald-900/70 border-l-2 border-emerald-400 transition-all',
+        buttonAction: 'bg-gradient-to-r from-teal-700 to-emerald-600 hover:from-teal-600 hover:to-emerald-500 text-white shadow-lg shadow-emerald-900/40',
+        
+        borderClass: 'border-l-4 border-emerald-500',
+        
+        // 🔥 DOBLE EFECTO: Linternas + Flora del Bosque (Luciérnagas)
+        activeEffects: ['lanterns', 'forest_flora'], 
+        
+        customCss: `
+            /* Animación de respiración lenta para el fondo */
+            @keyframes forest-breath { 
+                0% { background-position: 0% 50%; } 
+                50% { background-position: 100% 50%; } 
+                100% { background-position: 0% 50%; } 
+            }
+            body { 
+                background-size: 200% 200% !important; 
+                animation: forest-breath 30s ease-in-out infinite; 
+            }
+            ::-webkit-scrollbar-thumb { background: #34d399; }
+
+            /* TRUCO: Linternas color "Luz Fatu" (Verde espectral) + Desenfoque leve */
+            .lantern-item { 
+                filter: hue-rotate(85deg) brightness(1.2) drop-shadow(0 0 15px #34d399) !important; 
+                opacity: 0.8; 
+            }
+        `
+    },
     
     galaxy: {
         id: 'galaxy',
