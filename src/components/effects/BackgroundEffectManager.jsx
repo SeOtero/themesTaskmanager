@@ -10,6 +10,11 @@ import GoldenDust from './GoldenDust';
 import ShootingStars from './ShootingStars';
 import SnowEffect from './SnowEffect';
 import Lanterns from './Lanterns';
+import VampireBats from './VampireBats';
+import CozyFireplace from './CozyFireplace';
+import LofiAmbience from './LofiAmbience';
+import PineForest from './PineForest';
+import CozyAmbience from './CozyAmbience';
 import { BackgroundAudio, BackgroundRain } from './BackgroundEffects';
 
 // --- IMPORTS DE EFECTOS DE TEMPORADA ---
@@ -63,6 +68,12 @@ const BackgroundEffectsManager = ({ themeClasses, activeEffect }) => {
         'rain': BackgroundRain,
         'neon_grid': NeonCityBackground,
         'neko_pattern': NekoCozyBackground,
+        'cozy_fireplace': CozyFireplace,
+        'vampire_bats': VampireBats,
+        'lofi_ambience': LofiAmbience,
+        'pine_forest': PineForest,
+        'cozy_ambience': CozyAmbience, // Alias por si en themes.js se llama cozy_ambience
+
         
                
         // Efectos nuevos

@@ -146,8 +146,6 @@ export const THEMES = {
         // ✨ AQUÍ ESTÁ EL CAMBIO: AMBOS EFECTOS ACTIVOS ✨
         activeEffects: ['lofi_notes', 'cozy_lights', 'rain']
   },
-
-// ✅ NEON CITY: Sin URL externa, usa el generador de código
     neon: {
         id: 'neon',
         name: 'neon', 
@@ -217,19 +215,33 @@ export const THEMES = {
     crimson: {
         id: 'crimson',
         name: 'crimson',
-        label: '🩸 Crimson',
+        label: '🩸 Vampire Lord',
         type: 'theme',
         price: 250,
+        // Fondo más oscuro para que resalten los efectos
         bodyBg: 'bg-black',
-        rawBg: 'radial-gradient(circle, transparent 0%, #000000 80%), linear-gradient(to bottom, #450a0a 0%, #000000 100%)',
-        cardBg: 'bg-red-950/30 backdrop-blur-md border border-red-800/60 shadow-[0_0_40px_rgba(185,28,28,0.3)]',
-        primaryText: 'text-red-100 font-serif tracking-wide', secondaryText: 'text-red-400',
-        accentText: 'text-red-600 font-bold drop-shadow-[0_0_10px_rgba(220,38,38,0.8)]',
-        inputBorder: 'border-red-900/60', shopSelectBorder: 'border-red-500/40',
-        buttonAction: 'bg-red-950 hover:bg-red-900 text-white border border-red-800',
-        buttonAdd: 'bg-red-800 hover:bg-red-700 text-white shadow-lg',
+        rawBg: 'linear-gradient(to bottom, #2a0a0a 0%, #000000 100%)',
+        cardBg: 'bg-red-950/20 backdrop-blur-md border border-red-900/80 shadow-[0_0_50px_rgba(153,27,27,0.4)]',
+        primaryText: 'text-red-50 font-serif tracking-widest',
+        secondaryText: 'text-red-400',
+        accentText: 'text-red-600 font-bold drop-shadow-[0_0_8px_rgba(220,38,38,1)]',
+        inputBorder: 'border-red-900/60 focus:border-red-600',
+        shopSelectBorder: 'border-red-800',
+        buttonAction: 'bg-red-950 hover:bg-red-900 text-red-100 border border-red-800',
+        buttonAdd: 'bg-red-800 hover:bg-red-700 text-white shadow-[0_0_15px_#b91c1c]',
         modalBg: 'bg-black border-red-900',
-        activeEffects: ['mystic_fog']
+        
+        // EFECTOS ACTIVOS: Niebla, Murciélagos y "Partículas de sangre" (reusamos embers en rojo)
+        activeEffects: ['mystic_fog', 'vampire_bats'], 
+        
+        // CSS extra para pulsaciones en la tarjeta
+        customCss: `
+            .app-card { animation: heartbeat 4s infinite ease-in-out; }
+            @keyframes heartbeat {
+                0%, 100% { box-shadow: 0 0 30px rgba(153, 27, 27, 0.3); border-color: rgba(127, 29, 29, 0.6); }
+                50% { box-shadow: 0 0 60px rgba(220, 38, 38, 0.5); border-color: rgba(220, 38, 38, 0.8); }
+            }
+        `
     },
 
     royal: {
@@ -250,22 +262,26 @@ export const THEMES = {
         activeEffects: ['golden_dust']
     },
     
-    forest: {
+   forest: {
         id: 'forest',
         name: 'forest',
-        label: '🌲 Forest',
+        label: '🌲 Mystic Forest',
         type: 'theme',
         price: 150,
         bodyBg: 'bg-black',
-        rawBg: 'linear-gradient(180deg, #052e16 0%, #020617 100%)',
-        cardBg: 'bg-[#064e3b]/40 backdrop-blur-sm border border-green-700/50 shadow-2xl',
-        primaryText: 'text-emerald-100', secondaryText: 'text-emerald-500',
-        accentText: 'text-green-400 drop-shadow-[0_0_10px_rgba(74,222,128,0.5)]',
-        inputBorder: 'border-green-800', shopSelectBorder: 'border-green-500/40',
-        buttonAction: 'bg-green-900 hover:bg-green-800 text-white border border-green-700',
+        rawBg: 'linear-gradient(180deg, #022c22 0%, #052e16 100%)',
+        cardBg: 'bg-[#064e3b]/30 backdrop-blur-md border border-emerald-800/50 shadow-2xl',
+        primaryText: 'text-emerald-50',
+        secondaryText: 'text-emerald-400/80',
+        accentText: 'text-emerald-300 drop-shadow-[0_0_10px_rgba(52,211,153,0.6)]',
+        inputBorder: 'border-emerald-900',
+        shopSelectBorder: 'border-emerald-700/50',
+        buttonAction: 'bg-emerald-950 hover:bg-emerald-900 text-emerald-100 border border-emerald-800',
         buttonAdd: 'bg-emerald-700 hover:bg-emerald-600 text-white shadow-lg',
-        modalBg: 'bg-gray-900 border-green-800',
-        activeEffects: ['mystic_fog', 'forest_flora'] 
+        modalBg: 'bg-gray-900 border-emerald-800',
+        
+        // EFECTOS ACTIVOS: Niebla (se verá verde por el CSS del componente) y Luciérnagas
+        activeEffects: ['pine_forest', 'mystic_fog', 'forest_flora'], 
     },
    // VARIANT A: La Original (Cálida)
     beach: {

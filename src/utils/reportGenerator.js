@@ -40,10 +40,13 @@ export const generateCustomReport = (tasks, dateStr, themeName) => {
         
         if (!groups[shopName]) groups[shopName] = [];
         
+        // Limpiamos el nombre para quitar automáticamente el [Nombre Tienda] si existe
+        let rawName = task.text || task.name || "Tarea sin nombre";
+        let cleanName = rawName.replace(/\s*\[.*?\]/g, '').trim();
+
         // Agregamos al grupo
         groups[shopName].push({
-            name: task.text || task.name || "Tarea sin nombre",
-            // 🔥 CORRECCIÓN 2: Leemos 'count' (usado en contadores) o 'quantity'
+            name: cleanName,
             qty: parseInt(task.count || task.quantity) || 0,
             timeStr: formatMs(currentElapsed)
         });
