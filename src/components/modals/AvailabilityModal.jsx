@@ -79,7 +79,7 @@ const AvailabilityModal = ({ isOpen, onClose, user, userProfile, addCoins, logEv
         const cleanSchedule = {};
         ORDERED_DAYS.forEach(day => { cleanSchedule[day] = weekForm[day] || DEFAULT_FORM[day]; });
 
-        const userName = userProfile?.name || user.email || "Agente";
+        const userName = userProfile?.userName || user.email || "Agente";
 
         try {
             const snap = await getDoc(scheduleRef);

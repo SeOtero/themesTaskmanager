@@ -18,7 +18,7 @@ import { THEMES } from './data/themes';
 import { getTodayID, getCurrentWeekID } from './utils/helpers';
 
 // --- FIREBASE (Importamos limit para ahorrar lecturas) ---
-import { doc, getDoc, updateDoc, collection, addDoc, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore'; 
+import { doc, getDoc, updateDoc, setDoc, collection, addDoc, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore';
 import { db } from './firebase'; 
 
 // --- COMPONENTS ---
