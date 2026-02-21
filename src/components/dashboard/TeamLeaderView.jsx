@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, getDocs, getDoc, doc, updateDoc, setDoc, increment, deleteDoc, addDoc, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, doc, updateDoc, setDoc, increment, deleteDoc, addDoc, orderBy, onSnapshot, limit } from 'firebase/firestore';
 import { db, auth } from '../../firebase'; 
 import { getNextWeekID } from '../../utils/helpers'; 
 

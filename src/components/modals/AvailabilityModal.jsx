@@ -71,7 +71,8 @@ const AvailabilityModal = ({ isOpen, onClose, user, userProfile, addCoins, logEv
         setWeekForm({ ...weekForm, [day]: { ...weekForm[day], hours: newHours } });
     };
 
-    const handleSend = async () => {
+   const handleSend = async () => {
+        setLoading(true); // Bloqueamos el botón mientras guarda
         const docId = `${user.uid}_${activeWeekId}`;
         const scheduleRef = doc(db, "weekly_schedules", docId);
         
@@ -79,48 +80,63 @@ const AvailabilityModal = ({ isOpen, onClose, user, userProfile, addCoins, logEv
         const cleanSchedule = {};
         ORDERED_DAYS.forEach(day => { cleanSchedule[day] = weekForm[day] || DEFAULT_FORM[day]; });
 
-        const userName = userProfile?.userName || user.email || "Agente";
+        const userName = userProfile?.userName || user.email || "Agente"; // Aseguramos usar userName
 
         try {
+            const isUrgentChange = targetWeek === 'current';
             const snap = await getDoc(scheduleRef);
             const isModification = snap.exists();
-            const isUrgentChange = targetWeek === 'current';
 
             if (isUrgentChange || isModification) {
-                // 🔥 CAPTURAMOS EL "ANTES" 🔥
-                // Si existe en DB, lo usamos. Si no, asumimos vacío.
+                // 🔥 SOLICITUD DE CAMBIO (Urgent o Planificación) 🔥
                 const currentScheduleDB = isModification ? snap.data().schedule : DEFAULT_FORM;
-
                 const customMessage = isUrgentChange 
                     ? `${userName} quiere hacer cambios en la disponibilidad de esta semana!`
-                    : `${userName} cargó la disponibilidad de la siguiente semana!`;
+                    : `${userName} modificó la disponibilidad de la siguiente semana!`;
 
+                // Usamos addDoc para crear un documento nuevo en "schedule_requests"
                 await addDoc(collection(db, "schedule_requests"), {
                     uid: user.uid, 
                     userName: userName, 
                     weekId: activeWeekId, 
-                    
-                    currentSchedule: currentScheduleDB, // <--- GUARDAMOS EL ANTES
-                    proposedSchedule: cleanSchedule,    // <--- GUARDAMOS EL DESPUÉS
-                    
+                    currentSchedule: currentScheduleDB,
+                    proposedSchedule: cleanSchedule,
                     status: 'pending', 
                     type: isUrgentChange ? 'urgent' : 'planning',
                     message: customMessage,
-                    createdAt: Date.now()
+                    createdAt: Date.now() // Timestamp simple y seguro
                 });
                 
-                alert(isUrgentChange ? "🚨 SOLICITUD URGENTE ENVIADA" : "📩 CAMBIO ENVIADO");
+                alert(isUrgentChange ? "🚨 SOLICITUD URGENTE ENVIADA AL TEAM LEADER" : "📩 CAMBIO ENVIADO AL TEAM LEADER");
                 if(logEvent) logEvent("SCHEDULE_REQUEST_SENT");
+                
             } else {
-                // (El resto del guardado directo igual...)
+                // 🔥 GUARDADO DIRECTO (Primera vez para la próxima semana) 🔥
+                // Usamos setDoc con merge: true por si acaso
                 await setDoc(scheduleRef, { 
-                    uid: user.uid, userName: userName, team: userProfile?.team || 'default', 
-                    weekId: activeWeekId, schedule: cleanSchedule, submittedAt: Date.now() 
-                });
-                if (new Date().getDay() === 5 && targetWeek === 'next') { addCoins(50); alert("✅ Guardado + 50 Coins"); } else { alert("✅ Guardado"); }
+                    uid: user.uid, 
+                    userName: userName, 
+                    team: userProfile?.team || 'default', 
+                    weekId: activeWeekId, 
+                    schedule: cleanSchedule, 
+                    submittedAt: Date.now() 
+                }, { merge: true });
+
+                if (new Date().getDay() === 5 && targetWeek === 'next') { 
+                    addCoins(50); 
+                    alert("✅ Guardado + 50 Coins de Bonus de Viernes"); 
+                } else { 
+                    alert("✅ Horario guardado correctamente"); 
+                }
             }
             onClose();
-        } catch (e) { console.error(e); alert("Error al enviar."); }
+        } catch (error) { 
+            console.error("Error detallado al enviar disponibilidad:", error); 
+            // Mostramos el error real en la alerta para saber exactamente qué falló
+            alert(`Error al enviar: ${error.message}`); 
+        } finally {
+            setLoading(false); // Desbloqueamos
+        }
     };
 
     if (!isOpen) return null;
