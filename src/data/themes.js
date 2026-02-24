@@ -401,6 +401,62 @@ export const THEMES = {
         activeEffects: ['mystic_fog', 'shooting_stars']
     }, 
 
+    // --- SIGNATURE BIANCA: LULU STORE ---
+    signature_lulu: {
+        name: 'Signature: Lulu Store',
+        emoji: '🧸',
+        price: 3000, // Precio premium de Signature
+        category: 'theme',
+        description: 'Papelería kawaii y tonos aesthetic. Powered by Bianca.',
+        
+        // Fondo crema/beige suave (estilo papelería coreana)
+        rawBg: 'linear-gradient(135deg, #FDFBF7 0%, #F3EAE1 50%, #EADCDE 100%)',
+        
+        // Tarjeta semitransparente blanca con bordes color caramelo suave
+        cardBg: 'bg-white/60 backdrop-blur-xl border-2 border-[#D4A373]/40 shadow-[0_15px_40px_rgba(212,163,115,0.15)] rounded-3xl',
+        
+        // Textos: Marrón oscuro para lectura perfecta, detalles en caramelo
+        primaryText: 'text-[#5C4033] font-bold tracking-wide', 
+        secondaryText: 'text-[#8B5A2B]/90 font-medium', 
+        accentText: 'text-[#D4A373] drop-shadow-sm', 
+        
+        // UI: Botones y recuadros en tonos avellana
+        itemBg: 'bg-[#FAF4F0]/90 hover:bg-[#F0E6DD] border-l-4 border-[#D4A373] text-[#5C4033] transition-all shadow-sm',
+        buttonAction: 'bg-gradient-to-r from-[#D4A373] to-[#C18A59] hover:from-[#C18A59] hover:to-[#A67142] text-white shadow-lg shadow-[#D4A373]/30',
+        borderClass: 'border-b-4 border-[#D4A373]',
+        
+        // Efecto: Polvo dorado para darle ese toque mágico de "brillitos" que tiene en su bio
+        activeEffects: ['diamond_sparkles'], 
+        
+        customCss: `
+            /* 🔥 MARCA DE AGUA DEL LOGO 🔥 */
+            body::after {
+                content: '';
+                position: fixed;
+                bottom: -20px;
+                right: -20px;
+                width: 300px;
+                height: 300px;
+                /* Pega aquí el link de la imagen de su logo (fondo transparente idealmente) */
+                background-image: url('https://i.imgur.com/TuUrlDelLogoLulu.png'); 
+                background-size: contain;
+                background-repeat: no-repeat;
+                opacity: 0.08; /* Muy transparente para que no moleste la lectura */
+                pointer-events: none;
+                z-index: 0;
+            }
+            
+            /* Scrollbar color Caramelo */
+            ::-webkit-scrollbar-thumb { background: #D4A373; border-radius: 10px; border: 2px solid #FDFBF7; }
+            ::-webkit-scrollbar-track { background: #F3EAE1; }
+            
+            /* Cursor Kawaii (Patita/Osito) */
+            body { 
+                cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="%238B5A2B"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-2-5.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>') 12 12, auto !important; 
+            }
+        `
+    },
+
    
 
     // =========================================================================

@@ -60,25 +60,26 @@ export const parseHoursFromReport = (content) => {
 
 
 
-// --- FUNCIÓN AGREGADA PARA EL PLANNER ---
-export const getNextWeekID = () => {
-    const today = new Date();
-    const nextWeek = new Date(today);
-    nextWeek.setDate(today.getDate() + 7);
-    const year = nextWeek.getFullYear();
-    const firstDay = new Date(year, 0, 1);
-    const pastDays = (nextWeek - firstDay) / 86400000;
-    const weekNum = Math.ceil((pastDays + firstDay.getDay() + 1) / 7);
-    return `${year}-W${String(weekNum).padStart(2, '0')}`;
+// --- UTILIDADES DE FECHA (ISO 8601 STANDARDIZED) ---
+const getISOWeekId = (offsetWeeks = 0) => {
+    const date = new Date();
+    date.setDate(date.getDate() + (offsetWeeks * 7));
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return `${d.getUTCFullYear()}-W${weekNo.toString().padStart(2, '0')}`;
 };
-// ----------------------------------------
 
 export const getCurrentWeekID = () => {
-    const now = new Date();
-    const onejan = new Date(now.getFullYear(), 0, 1);
-    const week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay() + 1) / 7);
-    return `${now.getFullYear()}-W${week}`;
+    return getISOWeekId(0);
 };
+
+export const getNextWeekID = () => {
+    return getISOWeekId(1);
+};
+// ---------------------------------------------------
 
 export const generateEODRContent = (tasks, dateStr, themeName) => {
     let content = `REPORTE DIARIO - ${dateStr}\n--------------------------------\n`;

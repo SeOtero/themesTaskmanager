@@ -95,7 +95,7 @@ const MarketplaceModal = ({
                             const canBuy = userCoins >= (item.price || 0);
                             
                             // Detectamos tipos especiales
-                            const isSignature = item.id === 'signature_mickey_bianca';
+                            const isSignature = item.id.includes('signature');
                             const isLantern = LANTERN_IDS.includes(item.id);
 
                             // Estilos Dinámicos

@@ -1,24 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { doc, getDoc, addDoc, setDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, addDoc, setDoc, collection, query, where, getDocs, arrayUnion } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { getNextWeekID } from '../../utils/helpers'; 
-
-// --- HELPER LOCAL ---
-const getCurrentWeekID = () => {
-    const now = new Date();
-    const onejan = new Date(now.getFullYear(), 0, 1);
-    const week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay() + 1) / 7);
-    return `${now.getFullYear()}-W${week.toString().padStart(2, '0')}`;
-};
+import { getNextWeekID, getCurrentWeekID } from '../../utils/helpers'; 
 
 // --- DÍAS ORDENADOS ---
 const ORDERED_DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
 const AvailabilityModal = ({ isOpen, onClose, user, userProfile, addCoins, logEvent }) => {
     
-    // --- ESTADOS ---
+    // --- ESTADOS BÁSICOS ---
     const [targetWeek, setTargetWeek] = useState('next'); 
     const [loading, setLoading] = useState(false);
+    
+    // --- ESTADOS GOD MODE ---
+    const [agents, setAgents] = useState([]);
+    const [selectedAgentId, setSelectedAgentId] = useState(user?.uid);
     
     const DEFAULT_FORM = { 
         Lunes: { hours: 0, off: false }, Martes: { hours: 0, off: false }, Miércoles: { hours: 0, off: false }, 
@@ -31,13 +27,33 @@ const AvailabilityModal = ({ isOpen, onClose, user, userProfile, addCoins, logEv
         return targetWeek === 'next' ? getNextWeekID() : getCurrentWeekID();
     }, [targetWeek]);
 
-    // --- CARGAR DATOS ---
+    // --- EFECTO: CARGAR AGENTES (Solo si es TL o Admin) ---
     useEffect(() => {
         if (!isOpen) return;
+        const role = userProfile?.role;
+        if (role === 'team_leader' || role === 'admin') {
+            const fetchTeam = async () => {
+                try {
+                    const teamName = userProfile?.team || "Tema 1";
+                    const q = query(collection(db, "users"), where("team", "==", teamName));
+                    const snap = await getDocs(q);
+                    const teamData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    setAgents(teamData);
+                } catch (error) {
+                    console.error("Error buscando agentes:", error);
+                }
+            };
+            fetchTeam();
+        }
+    }, [isOpen, userProfile]);
+
+    // --- EFECTO: CARGAR HORARIO SEGÚN EL USUARIO SELECCIONADO ---
+    useEffect(() => {
+        if (!isOpen || !selectedAgentId) return;
         const loadSchedule = async () => {
             setLoading(true);
             try {
-                const docId = `${user.uid}_${activeWeekId}`;
+                const docId = `${selectedAgentId}_${activeWeekId}`;
                 const docRef = doc(db, "weekly_schedules", docId);
                 const snap = await getDoc(docRef);
 
@@ -51,7 +67,7 @@ const AvailabilityModal = ({ isOpen, onClose, user, userProfile, addCoins, logEv
             setLoading(false);
         };
         loadSchedule();
-    }, [isOpen, activeWeekId, user.uid]);
+    }, [isOpen, activeWeekId, selectedAgentId]);
 
     // --- MANEJO DE HORAS ---
     const adjustHours = (day, amount) => {
@@ -71,55 +87,66 @@ const AvailabilityModal = ({ isOpen, onClose, user, userProfile, addCoins, logEv
         setWeekForm({ ...weekForm, [day]: { ...weekForm[day], hours: newHours } });
     };
 
+   // --- GUARDADO GENERAL ---
    const handleSend = async () => {
-        setLoading(true); // Bloqueamos el botón mientras guarda
-        const docId = `${user.uid}_${activeWeekId}`;
+        setLoading(true);
+        
+        const isGodMode = selectedAgentId !== user.uid;
+        const targetUid = selectedAgentId;
+        const targetUserObj = isGodMode ? agents.find(a => a.id === selectedAgentId) : userProfile;
+        const targetUserName = targetUserObj?.userName || targetUserObj?.email || "Agente";
+
+        const docId = `${targetUid}_${activeWeekId}`;
         const scheduleRef = doc(db, "weekly_schedules", docId);
         
-        // Limpieza de datos (El "Después")
         const cleanSchedule = {};
         ORDERED_DAYS.forEach(day => { cleanSchedule[day] = weekForm[day] || DEFAULT_FORM[day]; });
-
-        const userName = userProfile?.userName || user.email || "Agente"; // Aseguramos usar userName
 
         try {
             const isUrgentChange = targetWeek === 'current';
             const snap = await getDoc(scheduleRef);
             const isModification = snap.exists();
 
-            if (isUrgentChange || isModification) {
-                // 🔥 SOLICITUD DE CAMBIO (Urgent o Planificación) 🔥
+            if (isGodMode) {
+                // 🔥 MODO DIOS: Fuerza el guardado e inyecta log de auditoría 🔥
+                await setDoc(scheduleRef, { 
+                    uid: targetUid, 
+                    userName: targetUserName, 
+                    team: targetUserObj?.team || 'default', 
+                    weekId: activeWeekId, 
+                    schedule: cleanSchedule, 
+                    submittedAt: Date.now(),
+                    loadedByLeader: true,
+                    auditTrail: arrayUnion({
+                        modifiedByUid: user.uid,
+                        modifiedByName: userProfile?.userName || user.email || "Líder",
+                        timestamp: Date.now(),
+                        dateReadable: new Date().toLocaleString()
+                    })
+                }, { merge: true });
+                alert(`✅ Horario de ${targetUserName} cargado manualmente.`);
+
+            } else if (isUrgentChange || isModification) {
+                // 🔥 AGENTE REGULAR: Solicitud de cambio 🔥
                 const currentScheduleDB = isModification ? snap.data().schedule : DEFAULT_FORM;
                 const customMessage = isUrgentChange 
-                    ? `${userName} quiere hacer cambios en la disponibilidad de esta semana!`
-                    : `${userName} modificó la disponibilidad de la siguiente semana!`;
+                    ? `${targetUserName} quiere hacer cambios en la disponibilidad de esta semana!`
+                    : `${targetUserName} modificó la disponibilidad de la siguiente semana!`;
 
-                // Usamos addDoc para crear un documento nuevo en "schedule_requests"
                 await addDoc(collection(db, "schedule_requests"), {
-                    uid: user.uid, 
-                    userName: userName, 
-                    weekId: activeWeekId, 
-                    currentSchedule: currentScheduleDB,
-                    proposedSchedule: cleanSchedule,
-                    status: 'pending', 
-                    type: isUrgentChange ? 'urgent' : 'planning',
-                    message: customMessage,
-                    createdAt: Date.now() // Timestamp simple y seguro
+                    uid: targetUid, userName: targetUserName, weekId: activeWeekId, 
+                    currentSchedule: currentScheduleDB, proposedSchedule: cleanSchedule,
+                    status: 'pending', type: isUrgentChange ? 'urgent' : 'planning',
+                    message: customMessage, createdAt: Date.now() 
                 });
-                
                 alert(isUrgentChange ? "🚨 SOLICITUD URGENTE ENVIADA AL TEAM LEADER" : "📩 CAMBIO ENVIADO AL TEAM LEADER");
                 if(logEvent) logEvent("SCHEDULE_REQUEST_SENT");
                 
             } else {
-                // 🔥 GUARDADO DIRECTO (Primera vez para la próxima semana) 🔥
-                // Usamos setDoc con merge: true por si acaso
+                // 🔥 AGENTE REGULAR: Guardado inicial 🔥
                 await setDoc(scheduleRef, { 
-                    uid: user.uid, 
-                    userName: userName, 
-                    team: userProfile?.team || 'default', 
-                    weekId: activeWeekId, 
-                    schedule: cleanSchedule, 
-                    submittedAt: Date.now() 
+                    uid: targetUid, userName: targetUserName, team: targetUserObj?.team || 'default', 
+                    weekId: activeWeekId, schedule: cleanSchedule, submittedAt: Date.now() 
                 }, { merge: true });
 
                 if (new Date().getDay() === 5 && targetWeek === 'next') { 
@@ -131,11 +158,10 @@ const AvailabilityModal = ({ isOpen, onClose, user, userProfile, addCoins, logEv
             }
             onClose();
         } catch (error) { 
-            console.error("Error detallado al enviar disponibilidad:", error); 
-            // Mostramos el error real en la alerta para saber exactamente qué falló
+            console.error("Error al enviar disponibilidad:", error); 
             alert(`Error al enviar: ${error.message}`); 
         } finally {
-            setLoading(false); // Desbloqueamos
+            setLoading(false);
         }
     };
 
@@ -154,6 +180,26 @@ const AvailabilityModal = ({ isOpen, onClose, user, userProfile, addCoins, logEv
                         <h3 className="text-lg font-bold text-white">📅 Mi Disponibilidad</h3>
                         <button onClick={onClose} className="text-slate-400 hover:text-white font-bold">✕</button>
                     </div>
+
+                    {/* 👑 MODO DIOS: VISIBLE SOLO PARA LÍDERES 👑 */}
+                    {(userProfile?.role === 'team_leader' || userProfile?.role === 'admin') && (
+                        <div className="mb-4 bg-indigo-900/30 border border-indigo-500/50 rounded-lg p-2">
+                            <label className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider mb-1 block">Cargar en nombre de:</label>
+                            <select 
+                                value={selectedAgentId} 
+                                onChange={(e) => setSelectedAgentId(e.target.value)}
+                                className="w-full bg-black/50 text-white text-sm border border-white/10 rounded-md p-1.5 outline-none focus:border-indigo-500"
+                            >
+                                <option value={user?.uid}>Yo mismo ({userProfile?.userName})</option>
+                                <optgroup label="Mi Equipo">
+                                    {agents.map(a => (
+                                        <option key={a.id} value={a.id}>{a.userName || a.email}</option>
+                                    ))}
+                                </optgroup>
+                            </select>
+                        </div>
+                    )}
+
                     <div className="bg-black/40 p-1 rounded-lg flex border border-white/5 relative">
                         <button onClick={() => setTargetWeek('current')} className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${targetWeek === 'current' ? 'bg-orange-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>ESTA SEMANA</button>
                         <button onClick={() => setTargetWeek('next')} className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${targetWeek === 'next' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>PRÓXIMA SEMANA</button>
@@ -200,7 +246,8 @@ const AvailabilityModal = ({ isOpen, onClose, user, userProfile, addCoins, logEv
                 {/* FOOTER */}
                 <div className="p-4 border-t border-white/10 bg-slate-900">
                     <button onClick={handleSend} className={`w-full text-white font-bold py-3 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 ${activeColor} hover:brightness-110`}>
-                        {isUrgentMode ? <span>📩</span> : <span>💾</span>} {buttonText}
+                        {selectedAgentId !== user?.uid ? <span>👑</span> : isUrgentMode ? <span>📩</span> : <span>💾</span>} 
+                        {selectedAgentId !== user?.uid ? 'GUARDAR MODO DIOS' : buttonText}
                     </button>
                 </div>
             </div>

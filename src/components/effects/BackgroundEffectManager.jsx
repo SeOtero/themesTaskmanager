@@ -15,6 +15,7 @@ import CozyFireplace from './CozyFireplace';
 import LofiAmbience from './LofiAmbience';
 import PineForest from './PineForest';
 import CozyAmbience from './CozyAmbience';
+import DiamondSparkles from './DiamondSparkles';
 import { BackgroundAudio, BackgroundRain } from './BackgroundEffects';
 
 // --- IMPORTS DE EFECTOS DE TEMPORADA ---
@@ -73,6 +74,7 @@ const BackgroundEffectsManager = ({ themeClasses, activeEffect }) => {
         'lofi_ambience': LofiAmbience,
         'pine_forest': PineForest,
         'cozy_ambience': CozyAmbience, // Alias por si en themes.js se llama cozy_ambience
+        'diamond_sparkles': DiamondSparkles,
 
         
                
@@ -103,16 +105,12 @@ const BackgroundEffectsManager = ({ themeClasses, activeEffect }) => {
             body.style.backgroundSize = 'cover';
         }
 
-        // 3. Cursor Custom (Neko o Mickey)
+        // 3. Custom CSS (Para cursores, logos, scrollbars, etc)
         if (themeClasses.customCss) {
             const style = document.createElement('style');
             style.id = 'theme-custom-css';
-            style.innerHTML = `body { ${themeClasses.customCss} }`;
+            style.innerHTML = themeClasses.customCss; // ✅ AHORA SÍ PASA EL CÓDIGO LIMPIO
             document.head.appendChild(style);
-        } else if (themeClasses.name === 'neko') {
-             // Cursor legacy para Neko si no usa customCss
-             const pinkPaw = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="%23ff69b4" stroke="white" stroke-width="1.5"><path d="M12 2C10.9 2 10 2.9 10 4C10 5.1 10.9 6 12 6C13.1 6 14 5.1 14 4C14 2.9 13.1 2 12 2M7 5C5.9 5 5 5.9 5 7C5 8.1 5.9 9 7 9C8.1 9 9 8.1 9 7C9 5.9 8.1 5 7 5M17 5C15.9 5 15 5.9 15 7C15 8.1 15.9 9 17 9C18.1 9 19 8.1 19 7C19 5.9 18.1 5 17 5M12 8C9.5 8 7.3 9.3 6.1 11.4C5.5 12.4 6.2 13.7 7.3 13.9L8.5 14.1C9.6 14.3 10.7 14.3 11.8 14.1L16.5 13.2C17.7 13 18.5 11.9 18.1 10.8C17.3 9.2 14.9 8 12 8Z"/></svg>') 16 16, auto`;
-             body.style.cursor = pinkPaw;
         }
 
     }, [themeClasses]);
