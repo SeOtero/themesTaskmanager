@@ -115,11 +115,8 @@ const TeamLeaderView = ({ initialTab = 'dashboard',onLogout, currentUserTeam, is
 
             // Listeners
             // Listener de Horarios seguro
-const qReq = isAdmin 
-    ? query(collection(db, "schedule_requests"), where("status", "==", "pending"))
-    : query(collection(db, "schedule_requests"), where("status", "==", "pending"), where("team", "==", currentUserTeam || 'Tema 1'));
-const reqUnsub = onSnapshot(qReq, (snap) => setScheduleRequests(snap.docs.map(d => ({id: d.id, ...d.data()}))));
-
+const qReq = query(collection(db, "schedule_requests"), where("status", "==", "pending"));
+            const reqUnsub = onSnapshot(qReq, (snap) => setScheduleRequests(snap.docs.map(d => ({id: d.id, ...d.data()}))));
 // Listener de Ideas seguro (Filtra DEV tickets para que las TLs no los vean)
 const qIdeas = isAdmin
     ? query(collection(db, "monday_ideas"), where("status", "==", "new"))
