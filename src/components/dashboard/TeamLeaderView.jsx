@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, query, where, getDocs, getDoc, doc, updateDoc, setDoc, increment, deleteDoc, addDoc, orderBy, onSnapshot, limit } from 'firebase/firestore';
 import { db, auth } from '../../firebase'; 
-import { getNextWeekID } from '../../utils/helpers'; 
+import { getNextWeekID, getCurrentWeekID } from '../../utils/helpers';
 
 // --- IMPORTAMOS LOS COMPONENTES ---
 import TLDashboardTab from './TLDashboardTab';
@@ -19,13 +19,7 @@ const KNOWN_TASKS = ["Columna CONFIRMADO", "Columna UPSELL", "Columna DATOS ENTR
 const WEEK_DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const DAY_MAP = { "Lunes": "Monday", "Martes": "Tuesday", "Miércoles": "Wednesday", "Jueves": "Thursday", "Viernes": "Friday", "Sábado": "Saturday", "Domingo": "Sunday" };
 
-// --- HELPERS INTERNOS ---
-const getCurrentWeekID = () => {
-    const now = new Date();
-    const onejan = new Date(now.getFullYear(), 0, 1);
-    const week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay() + 1) / 7);
-    return `${now.getFullYear()}-W${week.toString().padStart(2, '0')}`;
-};
+
 
 const TeamLeaderView = ({ initialTab = 'dashboard',onLogout, currentUserTeam, isAdmin }) => {
     
@@ -106,10 +100,16 @@ const TeamLeaderView = ({ initialTab = 'dashboard',onLogout, currentUserTeam, is
                 if (planSnap.exists()) setWeeklyPlan(planSnap.data().plan || {});
             } catch (e) { console.error(e); }
 
-            const sQuery = query(collection(db, 'weekly_schedules'), where('weekId', '==', activeWeekId));
+           const sQuery = query(collection(db, 'weekly_schedules'), where('weekId', '==', activeWeekId));
             const unsubSchedules = onSnapshot(sQuery, (snap) => {
                 const schedulesMap = {};
-                snap.docs.forEach(d => { const data = d.data(); if(data.uid) schedulesMap[data.uid] = data.schedule; });
+                snap.docs.forEach(d => { 
+                    const data = d.data(); 
+                    if(data.uid) {
+                        // Guardamos el horario y además su fecha de creación
+                        schedulesMap[data.uid] = { ...data.schedule, _updatedAt: data.updatedAt };
+                    }
+                });
                 setAgentSchedules(schedulesMap);
             });
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 const KNOWN_TASKS = ["Columna CONFIRMADO", "Columna UPSELL", "Columna DATOS ENTREGA", "Columna RESPONDER", "Columna REMINDER", "Chat en vivo (filtro Pendiente)", "Columna LATE VERIFICATION", "Chat en vivo (filtro Abiertos)", "Ordenes confirmadas sheet (CHECK info)", "CHAT Pending Orders", "CALL Pending Orders", "Facebook/Instagram Comments & Chats"];
@@ -22,6 +22,25 @@ const TLPlannerTab = ({
     const [selectedPlanDay, setSelectedPlanDay] = useState("Lunes");
     const [draggedAgent, setDraggedAgent] = useState(null);
 
+    // --- LÓGICA DE CALENDARIO INTELIGENTE ---
+    const getWeekDates = () => {
+        const now = new Date();
+        const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay();
+        const monday = new Date(now);
+        monday.setDate(now.getDate() - dayOfWeek + 1);
+        if (targetWeek === 'next') monday.setDate(monday.getDate() + 7);
+        
+        return WEEK_DAYS.map((dayName, i) => {
+            const d = new Date(monday);
+            d.setDate(monday.getDate() + i);
+            return {
+                dayName,
+                dateStr: `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`
+            };
+        });
+    };
+    const weekDatesArray = getWeekDates();
+
     // --- HANDLERS DRAG & DROP ---
     const handleDragStart = (e, agent) => {
         setDraggedAgent(agent);
@@ -40,15 +59,13 @@ const TLPlannerTab = ({
             const currentAssigns = newPlan[selectedPlanDay][taskName][shopName];
 
             if (agentData.id === 'ALL') {
-                squad.forEach(member => {
-                    if (!currentAssigns.find(a => a.id === member.id)) {
-                        currentAssigns.push({ id: member.userName || member.name || member.email });
-                    }
-                });
+                newPlan[selectedPlanDay][taskName][shopName] = [{ id: 'ALL', name: 'TODOS' }];
             } else {
-                if (!currentAssigns.find(a => a.id === agentData.id)) {
-                    currentAssigns.push({ id: agentData.id, name: agentData.userName || agentData.name || agentData.email });
+                let updatedAssigns = currentAssigns.filter(a => a.id !== 'ALL');
+                if (!updatedAssigns.find(a => a.id === agentData.id)) {
+                    updatedAssigns.push({ id: agentData.id, name: agentData.name });
                 }
+                newPlan[selectedPlanDay][taskName][shopName] = updatedAssigns;
             }
 
             setWeeklyPlan(newPlan);
@@ -71,7 +88,7 @@ const TLPlannerTab = ({
     return (
         <div className="flex flex-col h-[85vh] animate-fadeIn gap-4">
             
-            {/* --- BARRA DE HERRAMIENTAS (SIN CAMPANA) --- */}
+            {/* --- BARRA DE HERRAMIENTAS --- */}
             <div className="flex flex-wrap gap-4 justify-between items-center bg-slate-900/50 p-2 rounded-xl border border-white/5">
                 <div className="flex items-center gap-4">
                     <div className="flex bg-black/30 p-1 rounded-lg border border-white/5">
@@ -106,13 +123,11 @@ const TLPlannerTab = ({
                                 if (todaySchedule.off) statusBadge = <span className="text-[9px] bg-red-900/40 text-red-400 px-1 rounded font-bold border border-red-500/20">OFF</span>;
                                 else statusBadge = <span className="text-[9px] bg-green-900/40 text-green-400 px-1 rounded font-bold border border-green-500/20">{todaySchedule.hours}h</span>;
                             }
+                            const displayName = agent.userName || agent.name || agent.email;
                             return (
-                                <div key={agent.id} draggable onDragStart={(e) => handleDragStart(e, { id: agent.id, userName: agent.userName, name: agent.name, email: agent.email })} className="bg-slate-800 hover:bg-slate-700 p-3 rounded-lg cursor-grab active:cursor-grabbing border border-white/5 flex items-center gap-3 transition-colors">
-                                    <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center font-bold text-xs text-white">{(agent.userName || agent.name || agent.email).substring(0,2).toUpperCase()}</div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-sm truncate font-medium text-slate-300">{agent.userName || agent.name || agent.email}</div>
-                                        <div className="flex justify-end">{statusBadge}</div>
-                                    </div>
+                                <div key={agent.id} draggable onDragStart={(e) => handleDragStart(e, { id: agent.id, name: displayName })} className="bg-slate-800 hover:bg-slate-700 p-3 rounded-lg cursor-grab active:cursor-grabbing border border-white/5 flex items-center gap-3 transition-colors">
+                                    <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center font-bold text-xs text-white">{displayName.substring(0,2).toUpperCase()}</div>
+                                    <div className="flex-1 min-w-0"><div className="text-sm truncate font-medium text-slate-300">{displayName}</div><div className="flex justify-end">{statusBadge}</div></div>
                                 </div>
                             );
                         })}
@@ -138,13 +153,34 @@ const TLPlannerTab = ({
                     </div>
                     <div className="flex-1 overflow-auto">
                         <table className="w-full text-left border-collapse">
-                            <thead className="bg-[#0b0e14] sticky top-0 z-10"><tr><th className="p-4 text-xs font-bold text-slate-400 uppercase border-b border-white/10 w-64 bg-[#0b0e14] sticky left-0 z-20 border-r border-white/5">Agente</th>{WEEK_DAYS.map(day => (<th key={day} className="p-4 text-xs font-bold text-slate-400 uppercase border-b border-white/10 text-center min-w-[100px]">{day}</th>))}</tr></thead>
+                            <thead className="bg-[#0b0e14] sticky top-0 z-10">
+                                <tr>
+                                    <th className="p-4 text-xs font-bold text-slate-400 uppercase border-b border-white/10 w-64 bg-[#0b0e14] sticky left-0 z-20 border-r border-white/5">Agente</th>
+                                    {/* 🔥 DIBUJAMOS LAS FECHAS INTELIGENTES 🔥 */}
+                                    {weekDatesArray.map(({dayName, dateStr}) => (
+                                        <th key={dayName} className="p-4 text-xs font-bold text-slate-400 uppercase border-b border-white/10 text-center min-w-[100px]">
+                                            {dayName} <br/> <span className="text-[10px] text-indigo-400">{dateStr}</span>
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
                             <tbody className="divide-y divide-white/5 text-sm">
                                 {squad.map(user => {
                                     const userSchedule = agentSchedules[user.id];
+                                    const displayName = user.userName || user.name || user.email;
                                     return (
                                         <tr key={user.id} className="hover:bg-white/[0.02]">
-                                            <td className="p-4 bg-slate-900 sticky left-0 z-10 border-r border-white/5"><div className="font-bold text-white">{user.userName || user.name || user.email}</div><div className="text-[10px] text-slate-500 uppercase">{user.team}</div></td>
+                                            <td className="p-4 bg-slate-900 sticky left-0 z-10 border-r border-white/5">
+                                                <div className="font-bold text-white">{displayName}</div>
+                                                <div className="text-[10px] text-slate-500 uppercase">{user.team}</div>
+                                                
+                                                {/* 🔥 CHIVATO DE FECHA DE ENVÍO 🔥 */}
+                                                {userSchedule?._updatedAt && (
+                                                    <div className="text-[9px] text-teal-400/80 mt-1 font-mono bg-teal-900/10 inline-block px-1 rounded border border-teal-500/10">
+                                                        ⏱️ Enviado: {new Date(userSchedule._updatedAt).toLocaleDateString('es-AR', {day: '2-digit', month: '2-digit'})}
+                                                    </div>
+                                                )}
+                                            </td>
                                             {ENGLISH_DAYS.map((engDay, index) => {
                                                 const spanDay = WEEK_DAYS[index]; 
                                                 const dayData = userSchedule?.[engDay] || userSchedule?.[spanDay];
