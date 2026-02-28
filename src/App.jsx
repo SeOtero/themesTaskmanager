@@ -49,6 +49,7 @@ const AvailabilityModal = lazy(() => import('./components/modals/AvailabilityMod
 // Modales ligeros (se cargan normal)
 import ReportConfigModal from './components/modals/ReportConfigModal';
 import DeleteAllConfirmationModal from './components/modals/DeleteAllConfirmationModal';
+import WebWorkAlertModal from './components/modals/WebWorkAlertModal';
 
 // --- EFFECTS ---
 import { SpiderWeb } from './components/effects/BackgroundEffects';
@@ -193,6 +194,72 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
         distributeTasksTime,
         sortTasksByShop,
     } = taskData;
+
+   // --- CÁLCULO DE TIEMPO TOTAL HOY (Para Luciano) ---
+    const totalTimeTodayMs = (tasks || []).reduce((acc, t) => acc + (t?.elapsedTime || 0), 0);
+    const formatTotalTime = (ms) => {
+        if (!ms) return "0h 0m";
+        const h = Math.floor(ms / 3600000);
+        const m = Math.floor((ms % 3600000) / 60000);
+        return `${h}h ${m}m`;
+    };
+
+    // 🔥 EL INTERCEPTOR DE WEBWORK 🔥
+    const [isWebWorkAlertOpen, setIsWebWorkAlertOpen] = useState(false);
+    const [pendingTaskId, setPendingTaskId] = useState(null);
+
+    const handleTimerIntercept = (taskId) => {
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        if (task.isRunning) {
+            toggleTimer(taskId); // Si está corriendo y la queremos pausar, pasa directo
+            return;
+        }
+
+        const mode = userProfile?.settings?.webWorkMode || 'none';
+        
+        if (mode === 'none') {
+            toggleTimer(taskId);
+            return;
+        }
+
+        const today = new Date().toLocaleDateString('en-CA');
+        const lastAlertDate = localStorage.getItem('ww_alert_date');
+        const lastActive = localStorage.getItem('ww_last_active');
+        const now = Date.now();
+
+        let shouldShowAlert = false;
+
+        if (mode === 'daily') {
+            if (lastAlertDate !== today) shouldShowAlert = true; 
+        } else if (mode === 'smart') {
+            if (lastAlertDate !== today) {
+                shouldShowAlert = true; 
+            } else if (lastActive && (now - parseInt(lastActive)) > 60 * 60 * 1000) {
+                shouldShowAlert = true; // Si pasó 1 hora inactivo
+            }
+        }
+
+        if (shouldShowAlert) {
+            setPendingTaskId(taskId);
+            setIsWebWorkAlertOpen(true); // ¡TRAMPA ACTIVADA!
+        } else {
+            localStorage.setItem('ww_last_active', now.toString());
+            toggleTimer(taskId);
+        }
+    };
+
+    const confirmWebWork = () => {
+        const today = new Date().toLocaleDateString('en-CA');
+        localStorage.setItem('ww_alert_date', today);
+        localStorage.setItem('ww_last_active', Date.now().toString());
+        setIsWebWorkAlertOpen(false);
+        if (pendingTaskId) {
+            toggleTimer(pendingTaskId); 
+            setPendingTaskId(null);
+        }
+    };
 
     const { handleGenerate } = useReportManager(user, tasks, stopAllTimers, addCoins, userProfile);
 
@@ -559,13 +626,41 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
                                         </div>
                                     )}
 
+                                    {/* 🔥 LA LISTA DE TAREAS RECUPERADA 🔥 */}
                                     <div className="flex-1 overflow-y-auto task-scroll pr-2 space-y-3 min-h-[50vh] max-h-[65vh] border border-white/5 rounded-xl p-2 bg-black/10">
-                                        {tasks.length > 0 ? tasks.map((task) => ( <TaskListItem key={task.id} task={task} toggleTimer={toggleTimer} deleteTask={deleteTask} updateTaskDetails={updateTaskDetails} themeClasses={themeClasses} resetTaskTimer={resetTaskTimer} celebrationThemeName={themeClasses.name} /> )) : <p className={`text-center italic mt-10 ${themeClasses.secondaryText}`}>No hay tareas activas.</p>}
+                                        {tasks.length > 0 ? tasks.map((task) => ( 
+                                            <TaskListItem 
+                                                key={task.id} 
+                                                task={task} 
+                                                toggleTimer={handleTimerIntercept} /* CONECTADO A LA TRAMPA WEBWORK */
+                                                deleteTask={deleteTask} 
+                                                updateTaskDetails={updateTaskDetails} 
+                                                themeClasses={themeClasses} 
+                                                resetTaskTimer={resetTaskTimer} 
+                                                celebrationThemeName={themeClasses.name} 
+                                            /> 
+                                        )) : <p className={`text-center italic mt-10 ${themeClasses.secondaryText}`}>No hay tareas activas.</p>}
                                     </div>
+
                                     <div className="flex flex-col items-center w-full bg-black/20 p-4 rounded-xl border border-white/5 mt-auto">
+                                        
+                                        {/* CONTADOR DE TIEMPO TOTAL */}
+                                        <div className="mb-4 flex items-center gap-3 bg-slate-900/50 border border-white/10 px-5 py-2.5 rounded-xl shadow-inner">
+                                            <span className="text-xl">⏱️</span>
+                                            <span className="text-sm font-bold text-slate-400">Tiempo Total:</span>
+                                            <span className="text-lg font-mono font-bold text-indigo-400">{formatTotalTime(totalTimeTodayMs)}</span>
+                                        </div>
+
                                         <button type="button" onClick={() => setIsReportModalOpen(true)} className={`px-6 py-3 rounded-full font-semibold transition duration-300 shadow-lg w-full sm:w-auto ${themeClasses.buttonAction}`}>Generar E.O.D.R.</button>
                                         <ReportViewer content={reportOutput} themeClasses={themeClasses} placeholder="El reporte aparecerá aquí..." />
                                     </div>
+
+                                    {/* MODAL DE WEBWORK */}
+                                    <WebWorkAlertModal 
+                                        isOpen={isWebWorkAlertOpen} 
+                                        onConfirm={confirmWebWork} 
+                                        onCancel={() => setIsWebWorkAlertOpen(false)} 
+                                    />
                                 </div>
                             )}
                             
