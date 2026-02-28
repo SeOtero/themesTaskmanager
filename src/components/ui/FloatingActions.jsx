@@ -9,11 +9,7 @@ const FloatingActions = ({
 }) => {
     return (
         <>
-            {isLeader && (
-                <button onClick={onOpenDashboard} className="fixed top-12 right-4 z-50 bg-purple-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-                    👑 LÍDER
-                </button>
-            )}
+           
             
             <button 
                 onClick={() => { setIdeaType('dev'); onOpenIdeas(); }} 

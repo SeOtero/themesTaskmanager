@@ -12,6 +12,7 @@ import TLIdeasTab from './TLIdeasTab';
 import TLUsersTab from './TLUsersTab';
 import TLNotificationsModal from './TLNotificationsModal';
 import QuickNotesWidget from '../tools/QuickNotesWidget';
+import IdeasModal from '../modals/IdeasModal';
 
 // --- LISTA DE TAREAS ---
 const KNOWN_TASKS = ["Columna CONFIRMADO", "Columna UPSELL", "Columna DATOS ENTREGA", "Columna RESPONDER", "Columna REMINDER", "Chat en vivo (filtro Pendiente)", "Columna LATE VERIFICATION", "Chat en vivo (filtro Abiertos)", "Ordenes confirmadas sheet (CHECK info)", "CHAT Pending Orders", "CALL Pending Orders", "Facebook/Instagram Comments & Chats"];
@@ -26,7 +27,7 @@ const getCurrentWeekID = () => {
     return `${now.getFullYear()}-W${week.toString().padStart(2, '0')}`;
 };
 
-const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
+const TeamLeaderView = ({ initialTab = 'dashboard',onLogout, currentUserTeam, isAdmin }) => {
     
     // --- LÓGICA DE TIENDAS ---
     const visibleShops = useMemo(() => {
@@ -36,7 +37,12 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
     }, [currentUserTeam, isAdmin]);
 
     // --- ESTADOS ---
-    const [activeTab, setActiveTab] = useState('planner'); 
+    const [activeTab, setActiveTab] = useState(initialTab);
+    useEffect(() => {
+    if (initialTab) {
+        setActiveTab(initialTab);
+    }
+}, [initialTab]);
     const [targetWeek, setTargetWeek] = useState('current'); 
     
     const activeWeekId = useMemo(() => {
@@ -108,8 +114,17 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
             });
 
             // Listeners
-            const reqUnsub = onSnapshot(query(collection(db, "schedule_requests"), where("status", "==", "pending")), (snap) => setScheduleRequests(snap.docs.map(d => ({id: d.id, ...d.data()}))));
-            const ideasUnsub = onSnapshot(query(collection(db, "monday_ideas"), where("status", "==", "new")), (snap) => setPendingIdeas(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+            // Listener de Horarios seguro
+const qReq = isAdmin 
+    ? query(collection(db, "schedule_requests"), where("status", "==", "pending"))
+    : query(collection(db, "schedule_requests"), where("status", "==", "pending"), where("team", "==", currentUserTeam || 'Tema 1'));
+const reqUnsub = onSnapshot(qReq, (snap) => setScheduleRequests(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+
+// Listener de Ideas seguro (Filtra DEV tickets para que las TLs no los vean)
+const qIdeas = isAdmin
+    ? query(collection(db, "monday_ideas"), where("status", "==", "new"))
+    : query(collection(db, "monday_ideas"), where("status", "==", "new"), where("type", "==", "monday"), where("team", "==", currentUserTeam || 'Tema 1'));
+const ideasUnsub = onSnapshot(qIdeas, (snap) => setPendingIdeas(snap.docs.map(d => ({id: d.id, ...d.data()}))));
             const newsUnsub = onSnapshot(query(collection(db, "news_ticker"), orderBy("createdAt", "desc")), (snap) => setNewsList(snap.docs.map(d => ({id: d.id, ...d.data()}))));
             const quizUnsub = onSnapshot(collection(db, "training_modules"), (snap) => setQuizzes(snap.docs.map(d => ({id: d.id, ...d.data()}))));
 
@@ -277,14 +292,45 @@ const TeamLeaderView = ({ onLogout, currentUserTeam, isAdmin }) => {
                 {activeTab === 'users' && isAdmin && <TLUsersTab usersList={usersList} editingUserId={editingUserId} setEditingUserId={setEditingUserId} editForm={editForm} setEditForm={setEditForm} setPointsToSend={setPointsToSend} handleGivePoints={handleGivePoints} saveUserChanges={saveUserChanges} startEditingUser={startEditingUser} />}
             </div>
 
-            {/* MODALES FLOTANTES */}
-            <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-50">
-                <button onClick={() => { setNewIdeaType('dev'); setIsSendIdeaModalOpen(true); }} className="flex items-center justify-center w-12 h-12 bg-purple-600 hover:bg-purple-500 text-white rounded-full shadow-lg border border-white/20">👨‍💻</button>
-                <button onClick={() => { setNewIdeaType('monday'); setIsSendIdeaModalOpen(true); }} className="flex items-center justify-center w-14 h-14 bg-yellow-500 hover:bg-yellow-400 text-black rounded-full shadow-lg font-bold text-xl border border-white/20">💡</button>
+           {/* MODALES FLOTANTES (Estilo Tooltip Clean) */}
+            <div className="fixed bottom-6 right-6 flex flex-col items-end gap-3 z-50">
+                
+                {/* Botón DEV / BUGS */}
+                <button 
+                    onClick={() => { setNewIdeaType('dev'); setIsSendIdeaModalOpen(true); }} 
+                    className="group relative flex items-center justify-center w-12 h-12 bg-purple-600 hover:bg-purple-500 text-white rounded-full shadow-lg border border-white/20 transition-all hover:scale-105"
+                >
+                    <span className="text-xl">👨‍💻</span>
+                    {/* Tooltip Hover */}
+                    <span className="absolute right-full mr-4 bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-xl border border-white/10">
+                        Bugs / Ideas App
+                    </span>
+                </button>
+
+                {/* Botón IDEAS LUNES */}
+                <button 
+                    onClick={() => { setNewIdeaType('monday'); setIsSendIdeaModalOpen(true); }} 
+                    className="group relative flex items-center justify-center w-14 h-14 bg-yellow-500 hover:bg-yellow-400 text-black rounded-full shadow-lg font-bold border border-white/20 transition-all hover:scale-105"
+                >
+                    <span className="text-2xl">💡</span>
+                    {/* Tooltip Hover */}
+                    <span className="absolute right-full mr-4 bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-xl border border-white/10">
+                        Ideas Lunes
+                    </span>
+                </button>
+                
             </div>
             
-            {isSendIdeaModalOpen && (<div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"><div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl p-6"><h3 className="text-lg font-bold text-white mb-4">Nueva Idea</h3><textarea className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white text-sm h-40" value={newIdeaText} onChange={(e) => setNewIdeaText(e.target.value)} /><div className="flex gap-2 mt-4"><button onClick={handleSendIdea} className="flex-1 bg-indigo-600 py-2 rounded font-bold">Enviar</button><button onClick={()=>setIsSendIdeaModalOpen(false)} className="px-4 bg-slate-700 rounded">X</button></div></div></div>)}
-            {showSummaryModal && (<div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-4"><div className="bg-slate-900 w-full max-w-2xl h-[80vh] flex flex-col"><textarea readOnly value={summaryText} className="flex-1 bg-slate-950 p-6 text-green-400 font-mono" /><button onClick={()=>setShowSummaryModal(false)} className="py-3 bg-slate-800 text-white font-bold">Cerrar</button></div></div>)}
+            <IdeasModal 
+                isOpen={isSendIdeaModalOpen} 
+                onClose={() => {
+                    setIsSendIdeaModalOpen(false);
+                    fetchIdeas(); // Recargamos la lista del dashboard al cerrar para que veas tu idea
+                }} 
+                user={auth.currentUser} 
+                userProfile={{ team: currentUserTeam, name: auth.currentUser?.displayName }} 
+                initialType={newIdeaType} 
+            />
             {isGoalsModalOpen && (<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"><div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-lg p-6 max-h-[80vh] overflow-y-auto"><h3 className="text-lg font-bold text-white mb-4">Metas</h3><div className="space-y-2">{detectedTasks.map(t=>(<div key={t} className="flex justify-between text-sm text-slate-300"><span>{t}</span><input type="number" value={taskGoals[t]||''} onChange={e=>setTaskGoals({...taskGoals, [t]:e.target.value})} className="bg-black/40 w-16 text-center text-green-400"/></div>))}</div><button onClick={()=>setIsGoalsModalOpen(false)} className="mt-4 w-full bg-indigo-600 py-2 rounded font-bold">Listo</button></div></div>)}
                     {/* 🔥 WIDGET DE NOTAS RÁPIDAS 🔥 */}
             <QuickNotesWidget user={auth.currentUser} />

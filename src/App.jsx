@@ -36,6 +36,7 @@ import FloatingSalaryButton from './components/ui/FloatingSalaryButton';
 import NewsTicker from './components/ui/NewsTicker';
 import FloatingActions from './components/ui/FloatingActions';
 import QuickNotesWidget from './components/tools/QuickNotesWidget';
+import NotificationBell from './components/widgets/NotificationBell';
 
 // --- MODALES CON LAZY LOADING (AHORRO DE MEMORIA) ---
 const SalaryCalculatorModal = lazy(() => import('./components/modals/SalaryCalculatorModal'));
@@ -59,7 +60,8 @@ import BackgroundEffectsManager from './components/effects/BackgroundEffectManag
 const App = () => {
     const { user, loading } = useUser();
     const [userProfile, setUserProfile] = useState(null);
-    const [showDashboard, setShowDashboard] = useState(false); 
+    const [showDashboard, setShowDashboard] = useState(false);
+    const [targetDashboardTab, setTargetDashboardTab] = useState('dashboard'); 
 
    useEffect(() => {
         if (user) {
@@ -104,10 +106,19 @@ const App = () => {
     const isLeader = userProfile && (userProfile.role === 'admin' || userProfile.role === 'team_leader');
 
     if (isLeader && showDashboard) {
-        return <TeamLeaderView onLogout={() => setShowDashboard(false)} currentUserTeam={userProfile.team || 'default'} isAdmin={userProfile.role === 'admin'} />;
+        return <TeamLeaderView initialTab={targetDashboardTab} onLogout={() => setShowDashboard(false)} currentUserTeam={userProfile.team || 'default'} isAdmin={userProfile.role === 'admin'} />;
     }
 
-    return <AuthenticatedApp user={user} loading={loading} isLeader={isLeader} onOpenDashboard={() => setShowDashboard(true)} userProfile={userProfile} />;
+   return <AuthenticatedApp 
+        user={user} 
+        loading={loading} 
+        isLeader={isLeader} 
+        onOpenDashboard={(tabId) => {
+            setTargetDashboardTab(typeof tabId === 'string' ? tabId : 'dashboard');
+            setShowDashboard(true);
+        }} 
+        userProfile={userProfile} 
+    />;
 };
 
 
@@ -188,6 +199,8 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
     } = taskData;
 
     const { handleGenerate } = useReportManager(user, tasks, stopAllTimers, addCoins, userProfile);
+
+    
 
     const logEvent = async (eventName, data = {}) => {
         try { await addDoc(collection(db, "app_analytics"), { eventName, uid: user.uid, timestamp: Date.now(), data }); } catch (e) { console.error("Log error", e); }
@@ -399,9 +412,9 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
                 </div>
             )}
 
+            
             <FloatingActions 
                 isLeader={isLeader}
-                onOpenDashboard={onOpenDashboard}
                 onOpenIdeas={() => setIsIdeasModalOpen(true)}
                 onOpenAvailability={() => setIsAvailabilityModalOpen(true)}
                 setIdeaType={setIdeaType}
@@ -441,7 +454,32 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
 
             <BackgroundEffectsManager themeClasses={themeClasses} activeEffect={activeEffect} />
             <GlobalStatusMessage message={statusMessage} resumeAction={resumeStoppedTimers} dismissAction={clearStatusMessage} />
+           <BackgroundEffectsManager themeClasses={themeClasses} activeEffect={activeEffect} />
+            <GlobalStatusMessage message={statusMessage} resumeAction={resumeStoppedTimers} dismissAction={clearStatusMessage} />
+            
+            {/* 🔥 1. LLAMAMOS A LA ECONOMY BAR PARA QUE APAREZCA EN EL CENTRO 🔥 */}
             <EconomyBar coins={lofiCoins || 0} onOpenShop={() => setIsMarketModalOpen(true)} />
+
+            {/* 🔥 2. GRUPO DERECHO: LÍDER + CAMPANA (En top-12 para esquivar la marquesina) 🔥 */}
+            <div className="fixed top-12 right-5 z-[80] flex items-center gap-3 animate-fadeIn">
+                
+                {/* Botón de LÍDER */}
+                {(userProfile?.role === 'team_leader' || userProfile?.role === 'admin') && (
+                    <button 
+                        onClick={() => onOpenDashboard('dashboard')}
+                        className="flex items-center gap-2 h-10 px-4 bg-purple-600 hover:bg-purple-500 backdrop-blur-md text-white font-bold rounded-xl shadow-lg border border-purple-400/30 transition-all active:scale-95"
+                    >
+                        <span className="text-lg">👑</span>
+                        <span className="hidden sm:inline-block text-xs tracking-wider">LÍDER</span>
+                    </button>
+                )}
+
+                {/* Campanita de Notificaciones */}
+                <NotificationBell 
+                    userProfile={userProfile} 
+                    onClickAction={onOpenDashboard} 
+                />
+            </div>
             <FloatingSalaryButton onClick={() => setIsSalaryModalOpen(true)} />
             
            <ReportConfigModal 

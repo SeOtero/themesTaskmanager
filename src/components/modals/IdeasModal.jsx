@@ -4,21 +4,16 @@ import { db } from '../../firebase';
 
 const IdeasModal = ({ isOpen, onClose, user, userProfile, initialType }) => {
     
-    // 1. ESTADOS (Nombres correctos)
-    // Usamos 'ideaType' aquí, así que en el HTML debemos usar 'ideaType' también.
     const [ideaType, setIdeaType] = useState(initialType || "monday"); 
     const [ideaText, setIdeaText] = useState("");
     const [myIdeasHistory, setMyIdeasHistory] = useState([]);
 
-    // 2. EFECTOS (Siempre al nivel superior, nunca dentro de funciones)
-    // Este efecto actualiza el tipo si cambia desde afuera (botones flotantes)
     useEffect(() => {
         if (isOpen && initialType) {
             setIdeaType(initialType);
         }
     }, [isOpen, initialType]);
 
-    // Este efecto carga el historial cuando se abre el modal
     useEffect(() => {
         if (isOpen && user) {
             const loadHistory = async () => {
@@ -34,17 +29,18 @@ const IdeasModal = ({ isOpen, onClose, user, userProfile, initialType }) => {
         }
     }, [isOpen, user]);
 
-    // 3. HANDLERS
     const handleSendIdea = async () => {
         if (!ideaText.trim()) return;
         
         const now = new Date();
+        
+        // 🔥 CORRECCIÓN APLICADA AQUÍ: Aseguramos el userName y el equipo correcto
         const newIdea = { 
             uid: user.uid, 
-            userName: userProfile?.name || user.displayName || user.email, 
-            team: userProfile?.team || 'default', 
+            userName: userProfile?.userName || user.displayName || user.email || "Agente", 
+            team: userProfile?.team || 'Tema 1', // Evitamos el 'default'
             content: ideaText, 
-            type: ideaType, // Usamos la variable correcta
+            type: ideaType, 
             timestamp: Date.now(), 
             timestampStr: now.toLocaleString('es-AR'), 
             analysis: { pros: "", cons: "" }, 
@@ -70,7 +66,6 @@ const IdeasModal = ({ isOpen, onClose, user, userProfile, initialType }) => {
                 
                 {/* HEADER CON TABS */}
                 <div className="flex border-b border-white/10">
-                    {/* CORREGIDO: Usamos ideaType y setIdeaType */}
                     <button onClick={() => setIdeaType('monday')} className={`flex-1 p-4 text-sm font-bold transition-colors ${ideaType === 'monday' ? 'bg-yellow-900/20 text-yellow-400 border-b-2 border-yellow-500' : 'text-slate-500 hover:text-slate-300'}`}>
                         💡 Idea Lunes
                     </button>
@@ -83,7 +78,7 @@ const IdeasModal = ({ isOpen, onClose, user, userProfile, initialType }) => {
                 <div className="p-6 flex-1 overflow-y-auto">
                     <textarea 
                         className={`w-full bg-black/50 border rounded-lg p-3 text-white text-sm outline-none mb-3 h-32 resize-none focus:ring-1 ${ideaType === 'monday' ? 'border-yellow-900/50 focus:border-yellow-500' : 'border-purple-900/50 focus:border-purple-500'}`} 
-                        placeholder={ideaType === 'monday' ? "Describe tu propuesta para mejorar el equipo... Cuentan templates que falten o todo tema que queres que se trate el Lunes" : "Quiero que la app haga esto... / La app tiene este error..."}
+                        placeholder={ideaType === 'monday' ? "Describe tu propuesta para mejorar el equipo..." : "Quiero que la app haga esto... / La app tiene este error..."}
                         value={ideaText} 
                         onChange={(e) => setIdeaText(e.target.value)} 
                     />

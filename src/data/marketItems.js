@@ -33,14 +33,14 @@ export const MARKET_ITEMS = [
         icon: '🍃' 
     },
     { id: 'galaxy', name: 'Concepto: Cosmic Voyager', description: 'Viaje interestelar.', price: 1500, category: 'theme', icon: '🌌' },
-    { 
-        id: 'signature_lulu', 
-        name: 'Signature: Lulu Store', 
-        description: '✨ Artículos de bazar para regalar y regalarse 🐰 Powered by Bianca.', 
-        price: 3000, 
-        category: 'theme', 
-        icon: '🧸' 
-    },
+   // { 
+   //     id: 'signature_lulu', 
+   //     name: 'Signature: Lulu Store', 
+   //     description: '✨ Artículos de bazar para regalar y regalarse 🐰 Powered by Bianca.', 
+    //    price: 3000, 
+    //    category: 'theme', 
+  //      icon: '🧸' 
+   // },
 
     // --- MARCOS (BORDERS) ---
     // ✅ NUEVO: Borde Default (Gratis)
