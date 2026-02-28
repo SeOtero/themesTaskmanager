@@ -37,6 +37,7 @@ import NewsTicker from './components/ui/NewsTicker';
 import FloatingActions from './components/ui/FloatingActions';
 import QuickNotesWidget from './components/tools/QuickNotesWidget';
 import NotificationBell from './components/widgets/NotificationBell';
+import AgentSettingsModal from './components/modals/AgentSettingsModal'; // 🔥 NUEVO
 
 // --- MODALES CON LAZY LOADING (AHORRO DE MEMORIA) ---
 const SalaryCalculatorModal = lazy(() => import('./components/modals/SalaryCalculatorModal'));
@@ -63,40 +64,34 @@ const App = () => {
     const [showDashboard, setShowDashboard] = useState(false);
     const [targetDashboardTab, setTargetDashboardTab] = useState('dashboard'); 
 
-   useEffect(() => {
+  useEffect(() => {
         if (user) {
-            const fetchRole = async () => {
-                try {
-                    const docRef = doc(db, "users", user.uid);
-                    const docSnap = await getDoc(docRef);
-                    
-                    if (docSnap.exists()) {
-                        // Si existe, cargamos su perfil
-                        setUserProfile(docSnap.data());
-                    } else {
-                        // 🚨 AQUÍ ESTÁ LA MAGIA: SI NO EXISTE, LO CREAMOS 🚨
-                        const newProfile = { 
-                            uid: user.uid,
-                            email: user.email,
-                            // Si no tiene nombre (por ser email/pass), usamos la primera parte del mail
-                            userName: user.displayName || user.email.split('@')[0], 
-                            role: 'agent', 
-                            team: 'default',
-                            createdAt: Date.now(),
-                            photoURL: user.photoURL || null
-                        };
-                        
-                        // Guardamos en Firebase para que el Team Leader lo vea
-                        await setDoc(docRef, newProfile); // Necesitas importar setDoc arriba
-                        
-                        setUserProfile(newProfile);
-                        console.log("Perfil de usuario fantasma creado automáticamente.");
-                    }
-                } catch (e) { 
-                    console.error("Error fetching/creating user role", e); 
+            const docRef = doc(db, "users", user.uid);
+            
+            // 🔥 AHORA ESCUCHA EN TIEMPO REAL 🔥
+            const unsubscribe = onSnapshot(docRef, async (docSnap) => {
+                if (docSnap.exists()) {
+                    setUserProfile(docSnap.data());
+                } else {
+                    // Si no existe, lo creamos
+                    const newProfile = { 
+                        uid: user.uid,
+                        email: user.email,
+                        userName: user.displayName || user.email.split('@')[0], 
+                        role: 'agent', 
+                        team: 'default',
+                        createdAt: Date.now(),
+                        photoURL: user.photoURL || null
+                    };
+                    await setDoc(docRef, newProfile);
+                    setUserProfile(newProfile);
+                    console.log("Perfil creado automáticamente.");
                 }
-            };
-            fetchRole();
+            }, (error) => {
+                console.error("Error escuchando el perfil", error);
+            });
+
+            return () => unsubscribe(); // Limpiamos la escucha al desmontar
         }
     }, [user]);
 
@@ -166,6 +161,7 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
     const [isMarketModalOpen, setIsMarketModalOpen] = useState(false);
     const [isIdeasModalOpen, setIsIdeasModalOpen] = useState(false);
     const [isAvailabilityModalOpen, setIsAvailabilityModalOpen] = useState(false);
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [activeQuiz, setActiveQuiz] = useState(null);
 
     const [news, setNews] = useState([]);
@@ -446,6 +442,12 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
                     onPreview={handlePreviewItem} 
                 />
             </Suspense>
+            
+            <AgentSettingsModal 
+                isOpen={isSettingsModalOpen}
+                onClose={() => setIsSettingsModalOpen(false)}
+                userProfile={userProfile}
+            />
 
             {/* 🔥 WIDGET DE NOTAS (ASEGURADO CON Z-INDEX) 🔥 */}
             <div className="relative z-50">
@@ -460,9 +462,18 @@ const AuthenticatedApp = ({ user, loading, isLeader, onOpenDashboard, userProfil
             {/* 🔥 1. LLAMAMOS A LA ECONOMY BAR PARA QUE APAREZCA EN EL CENTRO 🔥 */}
             <EconomyBar coins={lofiCoins || 0} onOpenShop={() => setIsMarketModalOpen(true)} />
 
-            {/* 🔥 2. GRUPO DERECHO: LÍDER + CAMPANA (En top-12 para esquivar la marquesina) 🔥 */}
+            {/* 🔥 2. GRUPO DERECHO: AJUSTES + LÍDER + CAMPANA 🔥 */}
             <div className="fixed top-12 right-5 z-[80] flex items-center gap-3 animate-fadeIn">
                 
+                {/* Botón de Configuración (⚙️) */}
+                <button 
+                    onClick={() => setIsSettingsModalOpen(true)}
+                    className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-800/50 hover:bg-slate-700 text-slate-400 hover:text-white border border-white/10 transition-all active:scale-95 shadow-sm"
+                    title="Mi Perfil y Ajustes"
+                >
+                    <span className="text-xl">⚙️</span>
+                </button>
+
                 {/* Botón de LÍDER */}
                 {(userProfile?.role === 'team_leader' || userProfile?.role === 'admin') && (
                     <button 

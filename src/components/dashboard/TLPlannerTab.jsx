@@ -42,12 +42,12 @@ const TLPlannerTab = ({
             if (agentData.id === 'ALL') {
                 squad.forEach(member => {
                     if (!currentAssigns.find(a => a.id === member.id)) {
-                        currentAssigns.push({ id: member.id, name: member.name || member.email });
+                        currentAssigns.push({ id: member.userName || member.name || member.email });
                     }
                 });
             } else {
                 if (!currentAssigns.find(a => a.id === agentData.id)) {
-                    currentAssigns.push({ id: agentData.id, name: agentData.name || agentData.email });
+                    currentAssigns.push({ id: agentData.id, name: agentData.userName || agentData.name || agentData.email });
                 }
             }
 
@@ -107,9 +107,12 @@ const TLPlannerTab = ({
                                 else statusBadge = <span className="text-[9px] bg-green-900/40 text-green-400 px-1 rounded font-bold border border-green-500/20">{todaySchedule.hours}h</span>;
                             }
                             return (
-                                <div key={agent.id} draggable onDragStart={(e) => handleDragStart(e, { id: agent.id, name: agent.name || agent.email })} className="bg-slate-800 hover:bg-slate-700 p-3 rounded-lg cursor-grab active:cursor-grabbing border border-white/5 flex items-center gap-3 transition-colors">
-                                    <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center font-bold text-xs text-white">{(agent.name || agent.email).substring(0,2).toUpperCase()}</div>
-                                    <div className="flex-1 min-w-0"><div className="text-sm truncate font-medium text-slate-300">{agent.name || agent.email}</div><div className="flex justify-end">{statusBadge}</div></div>
+                                <div key={agent.id} draggable onDragStart={(e) => handleDragStart(e, { id: agent.id, userName: agent.userName, name: agent.name, email: agent.email })} className="bg-slate-800 hover:bg-slate-700 p-3 rounded-lg cursor-grab active:cursor-grabbing border border-white/5 flex items-center gap-3 transition-colors">
+                                    <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center font-bold text-xs text-white">{(agent.userName || agent.name || agent.email).substring(0,2).toUpperCase()}</div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-sm truncate font-medium text-slate-300">{agent.userName || agent.name || agent.email}</div>
+                                        <div className="flex justify-end">{statusBadge}</div>
+                                    </div>
                                 </div>
                             );
                         })}
@@ -141,7 +144,7 @@ const TLPlannerTab = ({
                                     const userSchedule = agentSchedules[user.id];
                                     return (
                                         <tr key={user.id} className="hover:bg-white/[0.02]">
-                                            <td className="p-4 bg-slate-900 sticky left-0 z-10 border-r border-white/5"><div className="font-bold text-white">{user.name || user.email}</div><div className="text-[10px] text-slate-500 uppercase">{user.team}</div></td>
+                                            <td className="p-4 bg-slate-900 sticky left-0 z-10 border-r border-white/5"><div className="font-bold text-white">{user.userName || user.name || user.email}</div><div className="text-[10px] text-slate-500 uppercase">{user.team}</div></td>
                                             {ENGLISH_DAYS.map((engDay, index) => {
                                                 const spanDay = WEEK_DAYS[index]; 
                                                 const dayData = userSchedule?.[engDay] || userSchedule?.[spanDay];
