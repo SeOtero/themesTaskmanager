@@ -17,10 +17,9 @@
 
 ## 📸 Pantallas
 
-> ![Vista del Agente](<img width="1879" height="902" alt="image" src="https://github.com/user-attachments/assets/7c80444b-53e7-4a45-91ca-80b9ff252522" />
-)
-> ![Vista del Líder](<img width="1864" height="889" alt="image" src="https://github.com/user-attachments/assets/05e8ad81-e5a1-4cc2-8126-2d1dc6ba585f" />
-)
+> ![Vista del Agente](https://github.com/user-attachments/assets/7c80444b-53e7-4a45-91ca-80b9ff252522)
+
+> ![Vista del Líder](https://github.com/user-attachments/assets/05e8ad81-e5a1-4cc2-8126-2d1dc6ba585f)
 
 ---
 
