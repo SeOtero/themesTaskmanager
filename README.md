@@ -1,11 +1,13 @@
 # 🚀 Nexus OS - Gamified Task & Time Manager
 
-<p align="center">
-  <img src="[https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)" alt="React">
-  <img src="[https://img.shields.io/badge/Firebase-ffca28?style=for-the-badge&logo=firebase&logoColor=black](https://img.shields.io/badge/Firebase-ffca28?style=for-the-badge&logo=firebase&logoColor=black)" alt="Firebase">
-  <img src="[https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)" alt="Tailwind CSS">
-  <img src="[https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=FFD62E](https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=FFD62E)" alt="Vite">
-</p>
+<div align="center">
+
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Firebase](https://img.shields.io/badge/Firebase-ffca28?style=for-the-badge&logo=firebase&logoColor=black)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=FFD62E)
+
+</div>
 
 <p align="center">
   Un gestor de tareas de alto rendimiento construido con React y Firebase. Presenta un ecosistema de doble interfaz: <strong>Nexus OS</strong> (un entorno inmersivo y gamificado para agentes) y el <strong>Team Leader Dashboard</strong> (un potente panel de administración asíncrono y en tiempo real).
