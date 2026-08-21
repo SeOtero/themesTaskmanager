@@ -1,0 +1,29 @@
+/* EkgNeonEffect.css */
+.ekg-container {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 200%;
+    
+    /* Aumentamos la altura del contenedor para que los picos se vean gigantes */
+    height: 300px;
+    
+    /* Centrado perfecto: empujamos hacia arriba exactamente la mitad de la altura */
+    margin-top: -150px; 
+    
+    animation: ekg-sweep 6s linear infinite;
+}
+
+.ekg-line {
+    width: 100%;
+    height: 100%;
+}
+
+@keyframes ekg-sweep {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(-50%);
+    }
+}

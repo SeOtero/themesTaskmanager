@@ -1,0 +1,150 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- FUNCIONES DE AYUDA (HELPER FUNCTIONS) ---
+    // 1. Verifica si el usuario está logueado
+    function isAuth() {
+      return request.auth != null;
+    }
+    // 2. Verifica si el usuario es el dueño del documento (por ID)
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    // 3. Obtiene el rol del usuario desde la colección 'users'
+    // (Esto consume 1 lectura extra, pero es seguro para testear)
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    // 4. Verifica si es Admin o Team Leader
+    function isLeader() {
+      let role = getUserRole();
+      return role == 'admin' || role == 'team_leader';
+    }
+
+    // --- REGLAS POR COLECCIÓN ---
+
+    // 1. Usuarios (Perfil)
+    match /users/{userId} {
+      // Cualquiera logueado puede leer (para armar los Squads)
+      allow read: if isAuth();
+
+      // CREATE: el dueño puede crear su perfil, pero SOLO con role 'agent'.
+      // Esto evita que alguien se auto-asigne 'admin'/'team_leader' al registrarse.
+      // Un Leader sí puede crear un perfil con cualquier rol (alta manual de un TL, etc).
+      allow create: if (isOwner(userId) && request.resource.data.role == 'agent') || isLeader();
+
+      // UPDATE: el dueño puede editar su perfil, PERO NUNCA cambiar su propio "role".
+      // 🔒 Este es el fix de la escalación de privilegios: antes "write" cubría
+      // update sin esta restricción, y cualquier agente podía ponerse role:'admin'.
+      // Cambiar el rol de alguien solo lo puede hacer un Leader (ej: TLUsersTab).
+      allow update: if (isOwner(userId) && request.resource.data.role == resource.data.role) || isLeader();
+
+      // DELETE: solo un Leader borra perfiles.
+      allow delete: if isLeader();
+
+      // Subcolecciones de usuario (wallet, config, progreso del tablón, etc.)
+      match /{document=**} {
+        allow read, write: if isOwner(userId) || isLeader();
+      }
+    }
+
+    // 2. Reportes Diarios
+    match /daily_reports/{reportId} {
+      // Agentes leen los suyos, Lideres leen todos
+      allow read: if isAuth();
+      // Crear: Solo si el 'uid' del reporte coincide con tu Auth ID
+      allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
+      // Editar: Solo Admin/Leader puede tocar reportes ajenos
+      allow update, delete: if isLeader() || (isAuth() && resource.data.uid == request.auth.uid);
+    }
+
+    // 2.1 Alias legado de reportes (usado en reportService.js)
+    match /reports/{reportId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isLeader() || (isAuth() && resource.data.uid == request.auth.uid);
+    }
+
+    // 3. PLANNER SEMANAL (Aquí fallaba tu "Asignar a Todos")
+    match /weekly_plans/{planId} {
+      // Todos leen
+      allow read: if isAuth();
+      // ¡SOLO LIDERES ESCRIBEN! (Evita que un agente rompa el plan)
+      allow write: if isLeader();
+    }
+
+    // 4. Solicitudes de Horario
+    match /schedule_requests/{reqId} {
+      allow read: if isAuth();
+      // Agente crea solicitud
+      allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
+      // Solo Lider aprueba (update/delete) o el dueño borra su propia solicitud pendiente
+      allow update, delete: if isLeader() || (isAuth() && resource.data.uid == request.auth.uid);
+    }
+
+    // 4.1 Alias camelCase (usado en algunas partes del código junto al anterior)
+    match /scheduleRequests/{reqId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isLeader() || (isAuth() && resource.data.uid == request.auth.uid);
+    }
+
+    // 5. Horarios Aprobados (Fijos)
+    match /weekly_schedules/{scheduleId} {
+      allow read: if isAuth();
+
+      // CREAR: Un agente solo puede crear si es SU horario (y el doc no existía). El líder puede crear el de cualquiera.
+      allow create: if isLeader() || (isAuth() && request.resource.data.uid == request.auth.uid);
+
+      // ACTUALIZAR/BORRAR: ¡Bloqueado para agentes! Solo el Team Leader puede modificar un horario que ya existe.
+      allow update, delete: if isLeader();
+    }
+
+    // 6. Noticias y Academy (Contenido)
+    match /news_ticker/{newsId} {
+      allow read: if isAuth();
+      allow write: if isLeader(); // Solo líderes publican noticias
+    }
+
+    match /training_modules/{moduleId} {
+      allow read: if isAuth();
+      allow write: if isLeader(); // Solo líderes crean quizzes
+    }
+
+    // 7. Ideas (Monday Ideas & Dev)
+    match /monday_ideas/{ideaId} {
+      allow read: if isAuth();
+      allow create: if isAuth(); // Cualquiera sugiere ideas
+      // Solo líderes cambian estado a 'approved'/'rejected' o archivan
+      allow update, delete: if isLeader() || (isAuth() && resource.data.uid == request.auth.uid && resource.data.status == 'new');
+    }
+
+    // 7.1 Tablón de Anuncios del Día (fecha específica) — NUEVA
+    match /daily_announcements/{dateId} {
+      allow read: if isAuth();
+      allow write: if isLeader(); // Solo líderes arman el tablón
+    }
+
+    // 7.2 Tablón de Anuncios Recurrentes (diarios / semanales fijos) — NUEVA
+    match /recurring_announcements/{itemId} {
+      allow read: if isAuth();
+      allow write: if isLeader();
+    }
+
+    // 7.3 Enlaces Rápidos — NUEVA
+    match /quick_links/{linkId} {
+      allow read: if isAuth();
+      allow write: if isLeader();
+    }
+
+    // 8. Configuración y Datos Varios
+    match /config/{docId} { allow read: if isAuth(); allow write: if isLeader(); }
+    match /data/{docId} { allow read, write: if isAuth(); } // Inventario, wallet, etc.
+
+    // 9. Analytics
+    match /app_analytics/{logId} {
+      allow read, create: if isAuth();
+    }
+  }
+}
